@@ -23,6 +23,7 @@ jobs:
 
       - name: Build WASM core
         run: |
+          mkdir -p wasm
           em++ -O2 -std=c++17 \
             -s MODULARIZE=1 -s EXPORT_NAME=createGothamModule \
             -s ENVIRONMENT=web,node \

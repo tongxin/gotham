@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GPU Roofline Simulator - LLM Inference</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="logo">▦</span> Roofline <span class="brand-sub">GPU Simulator</span></div>
+    <div class="topbar-note">Roofline analysis for LLM prefill &amp; decode</div>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <section class="side-section">
+        <div class="side-head">
+          <h3>Models</h3>
+          <div class="mini-btns">
+            <button id="modelAll" class="mini">all</button>
+            <button id="modelNone" class="mini">none</button>
+          </div>
+        </div>
+        <div id="modelList" class="model-list"></div>
+      </section>
+
+      <section class="side-section">
+        <h3>GPU</h3>
+        <select id="gpuSelect" class="select"></select>
+        <div id="gpuSpecs" class="specs"></div>
+      </section>
+
+      <section class="side-section">
+        <h3>Precision</h3>
+        <label class="field">Weights
+          <select id="precisionSelect" class="select"></select>
+        </label>
+        <label class="field">KV cache
+          <select id="kvPrecisionSelect" class="select"></select>
+        </label>
+      </section>
+
+      <section class="side-section">
+        <h3>Workload</h3>
+        <div class="seg" id="phaseSeg">
+          <button data-phase="prefill">Prefill</button>
+          <button data-phase="decode">Decode</button>
+          <button data-phase="both" class="active">Both</button>
+        </div>
+        <label class="field">Batch size <output id="bOut">1</output>
+          <input type="range" id="bSlider" min="0" max="10" value="0" step="1">
+        </label>
+        <label class="field">Sequence length <output id="sOut">2,048</output>
+          <input type="range" id="sSlider" min="7" max="14" value="11" step="1">
+        </label>
+        <label class="field">GPUs <output id="gOut">1</output>
+          <input type="range" id="gpuSlider" min="0" max="6" value="0" step="1">
+        </label>
+      </section>
+
+      <section class="side-section">
+        <h3>Advanced</h3>
+        <label class="field">Compute peak <output id="cOut">100%</output>
+          <input type="range" id="cSlider" min="-10" max="10" value="0" step="1">
+        </label>
+        <label class="field">Bandwidth <output id="bwOut">100%</output>
+          <input type="range" id="bwSlider" min="-10" max="10" value="0" step="1">
+        </label>
+        <label class="check"><input type="checkbox" id="showOtherCeilings" checked> Show other GPU ceilings</label>
+        <label class="check"><input type="checkbox" id="showPrecisionCeilings" checked> Show all precision ceilings</label>
+        <label class="check"><input type="checkbox" id="showSweep"> Decode batch-size sweep</label>
+      </section>
+    </aside>
+
+    <main class="content">
+      <section class="cards" id="statCards"></section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Roofline model</h2>
+          <div id="rooflineLegend" class="legend"></div>
+        </div>
+        <div id="roofline" class="chart"></div>
+        <div id="rooflineTip" class="chart-tip hidden"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Memory footprint per GPU</h2>
+        <div id="memoryLegend" class="legend"></div>
+        <div id="memoryChart" class="chart chart-sm"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Throughput</h2>
+        <div id="throughputLegend" class="legend"></div>
+        <div id="throughputChart" class="chart chart-sm"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Results</h2>
+        <div id="resultsTable" class="table-wrap"></div>
+      </section>
+
+      <section class="panel">
+        <h2>How the math works</h2>
+        <div class="math">
+          <p>This is an idealized roofline analysis. It models the <em>upper bound</em> on
+          performance from two resources &mdash; tensor-core compute and HBM bandwidth &mdash;
+          and ignores communication, kernel-launch, and software overhead.</p>
+          <pre>FLOPs(prefill) = B·S·2·N_active + 2·B·S²·L·(H + H_kv)
+FLOPs(decode/token) = 2·N_active + 2·L·S·(H + H_kv)
+DRAM bytes(prefill) = W + B·S·(2·L·H_kv·b_kv + 16·H)
+DRAM bytes(decode/step) = W + B·(2·L·S·H_kv·b_kv + 2·L·H_kv·b_kv + 16·H)
+Arithmetic intensity I = FLOPs / DRAM bytes
+Achieved = min(compute peak, bandwidth × I)
+Ridge point = compute peak / bandwidth</pre>
+          <p>Where <code>N_active</code> is active parameters (MoE models use only their
+          per-token active experts), <code>W</code> is weight bytes, <code>H</code> hidden size,
+          <code>H_kv</code> KV-head dimension (GQA shrinks the KV cache),
+          <code>L</code> layers, <code>S</code> sequence length, <code>B</code> batch size.
+          The 16&middot;H per-token term is a rough activation-traffic estimate.
+          Memory capacity includes weights, KV cache, and a FlashAttention-style activation
+          buffer estimate of 16&middot;B&middot;S&middot;H bytes. Multi-GPU results assume
+          ideal tensor-parallel scaling with weights and KV sharded across GPUs.</p>
+          <p>For the step beyond a single GPU &mdash; how data, tensor, pipeline, and expert
+          parallelism move bytes between chips and when communication becomes the bottleneck
+          &mdash; see the companion interactive visualization
+          <a href="https://ezyang.github.io/interactive-parallelize-transformer/"
+             target="_blank" rel="noopener" class="ref-link">How to Parallelize a Transformer
+          for Training</a>.</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="js/data.js"></script>
+  <script src="js/sim.js"></script>
+  <script src="js/chart.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

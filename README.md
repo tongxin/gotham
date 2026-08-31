@@ -5,6 +5,9 @@ The simulation math runs in a **C++ core** (`cpp/sim.cpp`), wrapped by **Python*
 through ctypes (`simulator/core.py`), and served to a dependency-free HTML/JS UI
 by a local API server (`simulator/server.py`).
 
+Full methodology — every knob, constraint, and equation that shapes the
+roofline — is documented in [docs/simulation-methodology.md](docs/simulation-methodology.md).
+
 ## Run it
 
 ```sh

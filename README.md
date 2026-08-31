@@ -44,7 +44,7 @@ WASM core locally:
 ```sh
 em++ -O2 -std=c++17 -s MODULARIZE=1 -s EXPORT_NAME=createGothamModule \
   -s ENVIRONMENT=web,node \
-  -s EXPORTED_FUNCTIONS='["_gotham_wasm_simulate","_gotham_wasm_l2_simulate","_gotham_wasm_memory","_gotham_wasm_peak_flops","_gotham_version","_malloc","_free"]' \
+  -s EXPORTED_FUNCTIONS='["_gotham_wasm_simulate","_gotham_wasm_l2_simulate","_gotham_wasm_memory","_gotham_wasm_peak_flops","_gotham_wasm_version","_malloc","_free"]' \
   -s EXPORTED_RUNTIME_METHODS='["wasmMemory"]' \
   -s ALLOW_MEMORY_GROWTH=1 \
   -o wasm/gotham.js cpp/sim.cpp cpp/l2.cpp cpp/wasm_glue.cpp

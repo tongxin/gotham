@@ -54,14 +54,15 @@
 
   function allocDoubles(mod, arr) {
     const p = mod._malloc(arr.length * 8);
-    mod.HEAPF64.set(arr, p / 8);
+    (mod.HEAPF64 || new Float64Array(mod.wasmMemory.buffer)).set(arr, p / 8);
     return p;
   }
   function readDoubles(mod, p, n) {
-    return Array.prototype.slice.call(mod.HEAPF64.subarray(p / 8, p / 8 + n));
+    const f64 = mod.HEAPF64 || new Float64Array(mod.wasmMemory.buffer);
+    return Array.prototype.slice.call(f64.subarray(p / 8, p / 8 + n));
   }
   function readCString(mod, p, cap) {
-    const u8 = mod.HEAPU8;
+    const u8 = mod.HEAPU8 || new Uint8Array(mod.wasmMemory.buffer);
     let s = '';
     for (let i = 0; i < cap; i++) {
       const b = u8[p + i];
@@ -100,7 +101,9 @@
   }
 
   function wasmVersion(mod) {
-    return mod.UTF8ToString(mod._gotham_wasm_version());
+    const ptr = mod._gotham_wasm_version();
+    if (mod.UTF8ToString) return mod.UTF8ToString(ptr);
+    return readCString(mod, ptr, 64);
   }
 
   function wasmL2(mod, m, gpu, cfg) {

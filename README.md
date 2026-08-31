@@ -1,15 +1,18 @@
 # Gotham — GPU Roofline Simulator for LLM Inference
 
-An interactive, dependency-free web app that models LLM prefill and decode on a
-roofline chart. Pick a model (or several to compare), a GPU, a precision, and a
-workload — the simulator computes arithmetic intensity, achieved performance,
-memory footprint, and throughput, then plots everything against the GPU's
-compute and memory ceilings.
+An interactive web app that models LLM prefill and decode on a roofline chart.
+The simulation math runs in a **C++ core** (`cpp/sim.cpp`), wrapped by **Python**
+through ctypes (`simulator/core.py`), and served to a dependency-free HTML/JS UI
+by a local API server (`simulator/server.py`).
 
 ## Run it
 
-Open `index.html` in any modern browser. No build step, no server, no
-dependencies.
+```sh
+make -C cpp                 # build libgotham.{dylib,so,dll} from the C++ core
+python3 -m simulator.server # serves the UI + API at http://127.0.0.1:8765
+```
+
+Then open http://127.0.0.1:8765. No pip installs, no npm, no build step for the UI.
 
 ## What you can do
 
@@ -29,6 +32,30 @@ dependencies.
 
 Hover any point on the roofline for intensity, achieved TFLOPS, utilization,
 throughput, and time.
+
+## Architecture
+
+```text
+cpp/sim.cpp          C++ roofline math, exported through a C ABI
+cpp/sim.hpp          C structs for model / GPU / workload / results
+cpp/Makefile         builds cpp/build/libgotham.{dylib,so,dll}
+simulator/data.py    model + GPU + precision catalogs (single source of truth)
+simulator/core.py    ctypes binding to the C++ core
+simulator/server.py  stdlib HTTP server: static UI + /api/data + /api/simulate
+simulator/cli.py     command-line access to the same core
+simulator/test_core.py  sanity checks (python3 simulator/test_core.py)
+js/app.js            UI state + fetch/render (no simulation math)
+js/chart.js          SVG chart renderers (roofline, memory, throughput)
+```
+
+There is deliberately **no math in JavaScript** — the browser only formats and
+plots numbers returned by `POST /api/simulate`. The same core is available from
+the command line:
+
+```sh
+python3 -m simulator.cli --model llama3-8b --gpu h100 --phase both \
+  --batch 1 --seq 2048 --precision fp16
+```
 
 ## The model
 
@@ -57,23 +84,3 @@ communication overhead, and software efficiency. For the next step — how data,
 tensor, pipeline, and expert parallelism move bytes between chips and when
 communication becomes the bottleneck — see the companion interactive
 visualization: [How to Parallelize a Transformer for Training](https://ezyang.github.io/interactive-parallelize-transformer/).
-
-## Project layout
-
-```text
-index.html      UI shell
-css/style.css   dark theme
-js/data.js      model + GPU + precision catalogs
-js/sim.js       roofline math (pure, node-testable)
-js/chart.js     SVG chart renderers (roofline, memory, throughput)
-js/app.js       state + wiring
-```
-
-`sim.js` and `data.js` are UMD modules, so the math can be exercised from Node:
-
-```sh
-node -e 'const d = require("./js/data.js"); const S = require("./js/sim.js");
-const g = d.gpus.find(x => x.id === "h100");
-const m = d.models.find(x => x.id === "llama3-8b");
-console.log(S.simulate(m, g, {precision:"fp16", kvPrecision:"fp16", phase:"both", B:1, S:2048, gpus:1, computeScale:1, bandwidthScale:1}));'
-```

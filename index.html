@@ -9,7 +9,7 @@
 <body>
   <header class="topbar">
     <div class="brand"><span class="logo">▦</span> Roofline <span class="brand-sub">GPU Simulator</span></div>
-    <div class="topbar-note">Roofline analysis for LLM prefill &amp; decode</div>
+    <div class="topbar-note"><span id="appStatus" class="app-status">Connecting…</span></div>
   </header>
 
   <div class="layout">
@@ -123,6 +123,10 @@ Ridge point = compute peak / bandwidth</pre>
           Memory capacity includes weights, KV cache, and a FlashAttention-style activation
           buffer estimate of 16&middot;B&middot;S&middot;H bytes. Multi-GPU results assume
           ideal tensor-parallel scaling with weights and KV sharded across GPUs.</p>
+          <p>The simulation itself runs in a <strong>C++ core</strong>
+          (<code>cpp/sim.cpp</code>, exposed through a C ABI), wrapped by Python
+          (<code>simulator/core.py</code> via ctypes) and served to this page by a local
+          API server (<code>simulator/server.py</code>). The JavaScript here only renders.</p>
           <p>For the step beyond a single GPU &mdash; how data, tensor, pipeline, and expert
           parallelism move bytes between chips and when communication becomes the bottleneck
           &mdash; see the companion interactive visualization
@@ -134,8 +138,6 @@ Ridge point = compute peak / bandwidth</pre>
     </main>
   </div>
 
-  <script src="js/data.js"></script>
-  <script src="js/sim.js"></script>
   <script src="js/chart.js"></script>
   <script src="js/app.js"></script>
 </body>

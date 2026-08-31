@@ -1,10 +1,6 @@
 (function () {
   'use strict';
 
-  var DATA = window.GPU_SIM_DATA;
-  var Sim = window.Sim;
-  var Charts = window.Charts;
-
   var PALETTE = ['#7aa2f7', '#9ece6a', '#f7768e', '#e0af68', '#bb9af7', '#7dcfff', '#ff9e64', '#73daca', '#c0caf5'];
   var PREC_COLORS = { fp32: '#565f89', fp8: '#bb9af7', int8: '#ff9e64', int4: '#f7768e' };
 
@@ -24,12 +20,18 @@
     showSweep: false,
   };
 
+  var catalog = null;
+  var last = null;
+  var requestSeq = 0;
+  var timer = null;
+  var rooflineChart = null;
+
   function $(id) { return document.getElementById(id); }
-  function gpu() { return DATA.gpus.find(function (g) { return g.id === state.gpuId; }); }
-  function selectedModels() { return DATA.models.filter(function (m) { return state.models.indexOf(m.id) >= 0; }); }
+  function gpu() { return catalog && catalog.gpus.find(function (g) { return g.id === state.gpuId; }); }
+  function selectedModels() { return catalog ? catalog.models.filter(function (m) { return state.models.indexOf(m.id) >= 0; }) : []; }
   function modelColor(i) { return PALETTE[i % PALETTE.length]; }
   function precisionLabel(id) {
-    var p = DATA.precisions.find(function (x) { return x.id === id; });
+    var p = catalog && catalog.precisions.find(function (x) { return x.id === id; });
     return p ? p.label : id;
   }
 
@@ -49,9 +51,15 @@
     return (s * 1e6).toFixed(0) + ' µs';
   }
 
+  function setStatus(msg, kind) {
+    var el = $('appStatus');
+    el.textContent = msg;
+    el.className = 'app-status' + (kind ? ' ' + kind : '');
+  }
+
   function buildGpuSelect() {
     var sel = $('gpuSelect');
-    sel.innerHTML = DATA.gpus.map(function (g) {
+    sel.innerHTML = catalog.gpus.map(function (g) {
       return '<option value="' + g.id + '">' + g.name + '</option>';
     }).join('');
     sel.value = state.gpuId;
@@ -60,19 +68,19 @@
   function buildPrecisionSelects() {
     var g = gpu();
     var sel = $('precisionSelect');
-    sel.innerHTML = DATA.precisions.filter(function (p) {
+    sel.innerHTML = catalog.precisions.filter(function (p) {
       return !p.needsFp8 || g.fp8_TFLOPS != null;
     }).map(function (p) {
       return '<option value="' + p.id + '">' + p.label + '</option>';
     }).join('');
-    if (DATA.precisions.filter(function (p) { return p.id === state.precision; }).length === 0 ||
-        !DATA.precisions.find(function (p) { return p.id === state.precision && (!p.needsFp8 || g.fp8_TFLOPS != null); })) {
-      state.precision = 'fp16';
-    }
+    var valid = catalog.precisions.some(function (p) {
+      return p.id === state.precision && (!p.needsFp8 || g.fp8_TFLOPS != null);
+    });
+    if (!valid) state.precision = 'fp16';
     sel.value = state.precision;
 
     var ksel = $('kvPrecisionSelect');
-    ksel.innerHTML = DATA.kvPrecisions.map(function (p) {
+    ksel.innerHTML = catalog.kvPrecisions.map(function (p) {
       return '<option value="' + p.id + '">' + p.label + '</option>';
     }).join('');
     ksel.value = state.kvPrecision;
@@ -81,7 +89,7 @@
   function buildModelList() {
     var wrap = $('modelList');
     wrap.innerHTML = '';
-    DATA.models.forEach(function (m, i) {
+    catalog.models.forEach(function (m) {
       var size = m.params >= 1 ? sig(m.params, 3) + 'B' : Math.round(m.params * 1000) + 'M';
       if (m.moe) size += ' · ' + sig(m.active, 3) + 'B act.';
       var item = document.createElement('label');
@@ -96,10 +104,10 @@
     $('gpuSelect').addEventListener('change', function () {
       state.gpuId = this.value;
       buildPrecisionSelects();
-      renderAll();
+      refresh();
     });
-    $('precisionSelect').addEventListener('change', function () { state.precision = this.value; renderAll(); });
-    $('kvPrecisionSelect').addEventListener('change', function () { state.kvPrecision = this.value; renderAll(); });
+    $('precisionSelect').addEventListener('change', function () { state.precision = this.value; refresh(); });
+    $('kvPrecisionSelect').addEventListener('change', function () { state.kvPrecision = this.value; refresh(); });
 
     var seg = $('phaseSeg');
     seg.addEventListener('click', function (ev) {
@@ -107,13 +115,13 @@
       if (!btn) return;
       state.phase = btn.getAttribute('data-phase');
       seg.querySelectorAll('button').forEach(function (b) { b.classList.toggle('active', b === btn); });
-      renderAll();
+      refresh();
     });
 
     function bindSlider(inputId, outId, fn) {
       $(inputId).addEventListener('input', function () {
         fn(+this.value, $(outId));
-        renderAll();
+        refresh();
       });
     }
     bindSlider('bSlider', 'bOut', function (v, out) { state.B = Math.pow(2, v); out.textContent = state.B.toLocaleString('en-US'); });
@@ -122,19 +130,19 @@
     bindSlider('cSlider', 'cOut', function (v, out) { state.computeScale = Math.pow(2, v / 10); out.textContent = Math.round(state.computeScale * 100) + '%'; });
     bindSlider('bwSlider', 'bwOut', function (v, out) { state.bandwidthScale = Math.pow(2, v / 10); out.textContent = Math.round(state.bandwidthScale * 100) + '%'; });
 
-    $('showOtherCeilings').addEventListener('change', function () { state.showOtherCeilings = this.checked; renderAll(); });
-    $('showPrecisionCeilings').addEventListener('change', function () { state.showPrecisionCeilings = this.checked; renderAll(); });
-    $('showSweep').addEventListener('change', function () { state.showSweep = this.checked; renderAll(); });
+    $('showOtherCeilings').addEventListener('change', function () { state.showOtherCeilings = this.checked; refresh(); });
+    $('showPrecisionCeilings').addEventListener('change', function () { state.showPrecisionCeilings = this.checked; refresh(); });
+    $('showSweep').addEventListener('change', function () { state.showSweep = this.checked; refresh(); });
 
     $('modelAll').addEventListener('click', function () {
-      state.models = DATA.models.map(function (m) { return m.id; });
+      state.models = catalog.models.map(function (m) { return m.id; });
       buildModelList();
-      renderAll();
+      refresh();
     });
     $('modelNone').addEventListener('click', function () {
       state.models = [];
       buildModelList();
-      renderAll();
+      refresh();
     });
     $('modelList').addEventListener('change', function (ev) {
       var cb = ev.target;
@@ -144,8 +152,51 @@
       if (cb.checked && idx < 0) state.models.push(id);
       if (!cb.checked && idx >= 0) state.models.splice(idx, 1);
       buildModelList();
-      renderAll();
+      refresh();
     });
+  }
+
+  function refresh() {
+    if (!catalog) return;
+    var seq = ++requestSeq;
+    clearTimeout(timer);
+    timer = setTimeout(function () {
+      fetch('/api/simulate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          models: state.models,
+          gpu: state.gpuId,
+          cfg: {
+            phase: state.phase,
+            B: state.B,
+            S: state.S,
+            gpus: state.gpus,
+            precision: state.precision,
+            kvPrecision: state.kvPrecision,
+            computeScale: state.computeScale,
+            bandwidthScale: state.bandwidthScale,
+            sweep: state.showSweep,
+            showPrecisionCeilings: state.showPrecisionCeilings,
+            showOtherCeilings: state.showOtherCeilings,
+          },
+        }),
+      })
+        .then(function (r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
+        .then(function (d) {
+          if (seq !== requestSeq) return;
+          last = d;
+          setStatus('C++ core ' + d.coreVersion + ' · ' + d.gpu.name);
+          renderAll();
+        })
+        .catch(function () {
+          if (seq !== requestSeq) return;
+          setStatus('Server error — check that python3 -m simulator.server is running', 'err');
+        });
+    }, 90);
   }
 
   function renderSpecs() {
@@ -161,24 +212,23 @@
   }
 
   function renderStats() {
+    if (!last) return;
     var g = gpu();
-    var peak = Sim.peakFlops(g, state.precision, state.computeScale);
-    var bw = g.bandwidth_GBps * 1e9 * state.bandwidthScale;
     $('statCards').innerHTML =
-      '<div class="card"><div class="c-label">Peak compute</div><div class="c-value">' + fmtTFlops(peak) +
+      '<div class="card"><div class="c-label">Peak compute</div><div class="c-value">' + fmtTFlops(last.peak) +
       '</div><div class="c-note">' + precisionLabel(state.precision) + (state.computeScale !== 1 ? ' · ' + Math.round(state.computeScale * 100) + '%' : '') + '</div></div>' +
-      '<div class="card"><div class="c-label">Memory bandwidth</div><div class="c-value">' + Math.round(bw / 1e9).toLocaleString('en-US') +
+      '<div class="card"><div class="c-label">Memory bandwidth</div><div class="c-value">' + Math.round(last.bw / 1e9).toLocaleString('en-US') +
       ' GB/s</div><div class="c-note">' + (state.bandwidthScale !== 1 ? Math.round(state.bandwidthScale * 100) + '% of spec' : 'spec peak') + '</div></div>' +
-      '<div class="card"><div class="c-label">Ridge point</div><div class="c-value">' + sig(peak / bw, 3) +
+      '<div class="card"><div class="c-label">Ridge point</div><div class="c-value">' + sig(last.ridge, 3) +
       ' FLOP/B</div><div class="c-note">left of ridge = memory-bound</div></div>' +
       '<div class="card"><div class="c-label">GPU memory</div><div class="c-value">' + g.memory_GB +
       ' GB</div><div class="c-note">' + state.gpus + ' GPU' + (state.gpus > 1 ? 's (TP sharded)' : '') + '</div></div>';
   }
 
-  function pointFor(modelInfo, phase, label, shape) {
+  function pointFor(model, phase, color, label, shape) {
     return {
-      title: modelInfo.model.name + ' · ' + label,
-      color: modelInfo.color,
+      title: model.name + ' · ' + label,
+      color: color,
       x: phase.intensity,
       y: phase.achieved,
       shape: shape,
@@ -195,70 +245,33 @@
     };
   }
 
+  function ceilingColor(c) {
+    if (c.primary) return '#7aa2f7';
+    if (c.kind === 'precision') return PREC_COLORS[c.id] || '#565f89';
+    return '#3b445f';
+  }
+
   function renderRoofline() {
     var container = $('roofline');
     var legendEl = $('rooflineLegend');
-    var g = gpu();
     var models = selectedModels();
-    if (!models.length) {
+    if (!last || !models.length) {
       container.innerHTML = '<div class="empty">Select at least one model to plot.</div>';
       legendEl.innerHTML = '';
       return;
     }
-
-    var sims = models.map(function (m, i) {
-      return { model: m, sim: Sim.simulate(m, g, state), color: modelColor(i) };
-    });
     var points = [];
-    sims.forEach(function (s) {
-      if (s.sim.prefill) points.push(pointFor(s, s.sim.prefill, 'Prefill', 'circle'));
-      if (s.sim.decode) points.push(pointFor(s, s.sim.decode, 'Decode', 'square'));
+    last.results.forEach(function (r, i) {
+      var color = modelColor(i);
+      if (r.prefill) points.push(pointFor(r.model, r.prefill, color, 'Prefill', 'circle'));
+      if (r.decode) points.push(pointFor(r.model, r.decode, color, 'Decode', 'square'));
     });
-
-    var peak = sims[0].sim.peak;
-    var bw = sims[0].sim.bw;
-    var ceilings = [{
-      peak: peak,
-      bandwidth: bw,
-      color: '#7aa2f7',
-      label: g.name + ' · ' + precisionLabel(state.precision),
-      primary: true,
-    }];
-
-    if (state.showPrecisionCeilings) {
-      DATA.precisions.forEach(function (p) {
-        if (p.id === state.precision) return;
-        if (p.needsFp8 && g.fp8_TFLOPS == null) return;
-        ceilings.push({
-          peak: Sim.peakFlops(g, p.id, state.computeScale),
-          bandwidth: bw,
-          color: PREC_COLORS[p.id] || '#565f89',
-          label: precisionLabel(p.id),
-        });
-      });
-    }
-    if (state.showOtherCeilings) {
-      DATA.gpus.forEach(function (other) {
-        if (other.id === g.id) return;
-        ceilings.push({
-          peak: other.fp16_TFLOPS * 1e12,
-          bandwidth: other.bandwidth_GBps * 1e9,
-          color: '#3b445f',
-          label: other.name,
-        });
-      });
-    }
-
-    var sweeps = [];
-    if (state.showSweep && (state.phase === 'decode' || state.phase === 'both')) {
-      sims.forEach(function (s) {
-        sweeps.push({
-          color: s.color,
-          points: Sim.decodeSweep(s.model, g, state).map(function (p) { return { x: p.x, y: p.y }; }),
-        });
-      });
-    }
-
+    var ceilings = last.ceilings.map(function (c) {
+      return { peak: c.peak, bandwidth: c.bandwidth, color: ceilingColor(c), primary: !!c.primary };
+    });
+    var sweeps = (last.sweeps || []).map(function (sw, i) {
+      return { color: modelColor(i), points: sw.points.map(function (p) { return { x: p.x, y: p.y }; }) };
+    });
     rooflineChart.update({ points: points, ceilings: ceilings, sweeps: sweeps, primaryColor: '#7aa2f7' });
     legendEl.innerHTML = models.map(function (m, i) {
       return '<span class="lg"><span class="sw" style="background:' + modelColor(i) + '"></span>' + m.name + '</span>';
@@ -268,52 +281,43 @@
   }
 
   function renderMemory() {
+    if (!last) return;
     var g = gpu();
-    var models = selectedModels();
-    var rows = models.map(function (m, i) {
-      var mem = Sim.memoryFootprint(m, state);
+    var rows = last.results.map(function (r, i) {
       return {
-        label: m.name + (state.gpus > 1 ? ' (per GPU)' : ''),
+        label: r.model.name + (state.gpus > 1 ? ' (per GPU)' : ''),
         color: modelColor(i),
-        weights: mem.weights / state.gpus,
-        kv: mem.kv / state.gpus,
-        act: mem.act / state.gpus,
-        total: mem.total / state.gpus,
+        weights: r.memory_per_gpu.weights,
+        kv: r.memory_per_gpu.kv,
+        act: r.memory_per_gpu.act,
+        total: r.memory_per_gpu.total,
       };
     });
     $('memoryLegend').innerHTML = Charts.memoryChart($('memoryChart'), rows, g.memory_GB * 1e9);
   }
 
   function renderThroughput() {
-    var g = gpu();
-    var models = selectedModels();
-    var rows = models.map(function (m, i) {
-      var s = Sim.simulate(m, g, state);
+    if (!last) return;
+    var rows = last.results.map(function (r, i) {
       var bars = [];
-      if (s.prefill) bars.push({ name: 'Prefill', label: 'Prefill', value: s.prefill.throughput, color: modelColor(i) });
-      if (s.decode) bars.push({ name: 'Decode', label: 'Decode', value: s.decode.throughput, color: modelColor(i) });
-      return { label: m.name, color: modelColor(i), bars: bars };
+      if (r.prefill) bars.push({ name: 'Prefill', label: 'Prefill', value: r.prefill.throughput, color: modelColor(i) });
+      if (r.decode) bars.push({ name: 'Decode', label: 'Decode', value: r.decode.throughput, color: modelColor(i) });
+      return { label: r.model.name, color: modelColor(i), bars: bars };
     });
     $('throughputLegend').innerHTML = Charts.throughputChart($('throughputChart'), rows);
   }
 
   function renderTable() {
+    if (!last) return;
     var g = gpu();
-    var models = selectedModels();
-    if (!models.length) {
-      $('resultsTable').innerHTML = '<div class="empty">Select at least one model.</div>';
-      return;
-    }
     var body = '';
-    models.forEach(function (m, i) {
-      var s = Sim.simulate(m, g, state);
-      var mem = Sim.memoryFootprint(m, state);
-      var perGpuGB = mem.total / state.gpus / 1e9;
+    last.results.forEach(function (r) {
+      var perGpuGB = r.memory_per_gpu.total / 1e9;
       var memTag = perGpuGB > g.memory_GB
         ? '<span class="tag oom">' + perGpuGB.toFixed(1) + ' / ' + g.memory_GB + ' GB</span>'
         : '<span class="tag ok">' + perGpuGB.toFixed(1) + ' / ' + g.memory_GB + ' GB</span>';
-      if (s.prefill) body += tableRow(m.name, 'Prefill', s.prefill, memTag);
-      if (s.decode) body += tableRow(m.name, 'Decode', s.decode, memTag);
+      if (r.prefill) body += tableRow(r.model.name, 'Prefill', r.prefill, memTag);
+      if (r.decode) body += tableRow(r.model.name, 'Decode', r.decode, memTag);
     });
     $('resultsTable').innerHTML =
       '<table><thead><tr>' +
@@ -346,7 +350,28 @@
     renderTable();
   }
 
-  var rooflineChart = new Charts.RooflineChart($('roofline'), $('rooflineTip'));
+  function init() {
+    rooflineChart = new Charts.RooflineChart($('roofline'), $('rooflineTip'));
+    setStatus('Connecting to simulation server…');
+    fetch('/api/data')
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (d) {
+        catalog = d;
+        buildGpuSelect();
+        buildPrecisionSelects();
+        buildModelList();
+        wireEvents();
+        refresh();
+      })
+      .catch(function () {
+        setStatus('Simulation server unreachable — run: python3 -m simulator.server', 'err');
+        ['roofline', 'memoryChart', 'throughputChart'].forEach(function (id) {
+          $(id).innerHTML = '<div class="empty">Waiting for the simulation server…</div>';
+        });
+        $('resultsTable').innerHTML = '<div class="empty">Waiting for the simulation server…</div>';
+      });
+    window.addEventListener('resize', function () { if (last) renderAll(); });
+  }
+
   init();
-  window.addEventListener('resize', function () { renderAll(); });
 })();

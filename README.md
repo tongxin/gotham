@@ -16,10 +16,10 @@ Then open http://127.0.0.1:8765. No pip installs, no npm, no build step for the 
 
 ## What you can do
 
-- **Compare models** — select multiple models (dense and MoE: LLaMA, GPT, Mistral,
-  Mixtral, Qwen, DeepSeek-V3, …) and plot prefill and decode points on the same
-  roofline.
-- **Pick hardware** — H100/H200/B200, A100, MI300X, L40S, RTX 4090/3090, T4,
+- **Compare models** — select multiple models (dense and MoE: LLaMA, GPT, GLM-5.2/5.3,
+  DeepSeek-V3/V4, Qwen3, Mistral, Mixtral, …) and plot prefill and decode points on the
+  same roofline.
+- **Pick hardware** — H100/H200/B200/B300, A100, MI300X, L40S, RTX 4090/3090, T4,
   with optional ghost ceilings for the other GPUs.
 - **Vary precision** — FP32 / FP16-BF16 / FP8 / INT8 / INT4 weights, plus a
   separate KV-cache dtype; overlay all precision ceilings for the selected GPU.

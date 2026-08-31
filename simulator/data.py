@@ -14,12 +14,18 @@ MODELS = [
     {"id": "llama3-70b", "name": "LLaMA-3 70B", "params": 70.6, "layers": 80, "hidden": 8192, "heads": 64, "kv_heads": 8, "vocab": 128256},
     {"id": "gpt3-175b", "name": "GPT-3 175B", "params": 175, "layers": 96, "hidden": 12288, "heads": 96, "vocab": 50257},
     {"id": "deepseek-v3", "name": "DeepSeek-V3 671B", "params": 671, "active": 37, "layers": 61, "hidden": 7168, "heads": 128, "vocab": 129280, "moe": True, "note": "MLA, 256 experts, top-8"},
+    {"id": "glm-5.2", "name": "GLM-5.2 743B", "params": 743, "active": 39, "layers": 78, "hidden": 6144, "heads": 64, "kv_heads": 8, "vocab": 151936, "moe": True, "note": "DSA, 256 experts, 1M ctx"},
+    {"id": "glm-5.3", "name": "GLM-5.3 744B", "params": 744, "active": 40, "layers": 78, "hidden": 6144, "heads": 64, "kv_heads": 8, "vocab": 151936, "moe": True, "note": "Same base as 5.2, ~40B active"},
+    {"id": "deepseek-v4-flash", "name": "DeepSeek-V4 Flash", "params": 284, "active": 13, "layers": 43, "hidden": 4096, "heads": 64, "kv_heads": 1, "vocab": 129280, "moe": True, "note": "DSA, 256 experts, top-6, 1M ctx"},
+    {"id": "deepseek-v4-pro", "name": "DeepSeek-V4 Pro", "params": 1600, "active": 49, "layers": 61, "hidden": 7168, "heads": 128, "kv_heads": 1, "vocab": 129280, "moe": True, "note": "DSA, 384 experts, top-6, 1M ctx"},
+    {"id": "qwen3-30b-a3b", "name": "Qwen3 30B-A3B", "params": 30.5, "active": 3, "layers": 48, "hidden": 2048, "heads": 32, "kv_heads": 8, "vocab": 151936, "moe": True, "note": "64 experts, top-8"},
 ]
 
 GPUS = [
     {"id": "h100", "name": "NVIDIA H100 SXM", "memory_GB": 80, "bandwidth_GBps": 3350, "fp16_TFLOPS": 989.5, "fp8_TFLOPS": 1979, "fp32_TFLOPS": 67, "sram_MB": 50, "note": "Hopper, HBM3"},
     {"id": "h200", "name": "NVIDIA H200", "memory_GB": 141, "bandwidth_GBps": 4800, "fp16_TFLOPS": 989.5, "fp8_TFLOPS": 1979, "fp32_TFLOPS": 67, "sram_MB": 50, "note": "Hopper, HBM3e"},
     {"id": "b200", "name": "NVIDIA B200", "memory_GB": 192, "bandwidth_GBps": 8000, "fp16_TFLOPS": 2250, "fp8_TFLOPS": 4500, "fp32_TFLOPS": 80, "sram_MB": 126, "note": "Blackwell, dual-die"},
+    {"id": "b300", "name": "NVIDIA B300", "memory_GB": 288, "bandwidth_GBps": 8000, "fp16_TFLOPS": 2800, "fp8_TFLOPS": 5600, "fp32_TFLOPS": 100, "sram_MB": 126, "note": "Blackwell Ultra, HBM3e"},
     {"id": "a100-80", "name": "NVIDIA A100 80GB", "memory_GB": 80, "bandwidth_GBps": 2039, "fp16_TFLOPS": 312, "fp8_TFLOPS": None, "fp32_TFLOPS": 19.5, "sram_MB": 40, "note": "Ampere, HBM2e"},
     {"id": "a100-40", "name": "NVIDIA A100 40GB", "memory_GB": 40, "bandwidth_GBps": 1555, "fp16_TFLOPS": 312, "fp8_TFLOPS": None, "fp32_TFLOPS": 19.5, "sram_MB": 40, "note": "Ampere, HBM2"},
     {"id": "mi300x", "name": "AMD MI300X", "memory_GB": 192, "bandwidth_GBps": 5300, "fp16_TFLOPS": 1307, "fp8_TFLOPS": 2614, "fp32_TFLOPS": 81.7, "sram_MB": 256, "note": "CDNA3, HBM3"},

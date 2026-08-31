@@ -36,7 +36,7 @@ body {
 .brand { font-size: 17px; font-weight: 700; letter-spacing: .2px; }
 .brand .logo { color: var(--accent); margin-right: 8px; }
 .brand .brand-sub { color: var(--muted); font-weight: 500; }
-.topbar-note { color: var(--muted); font-size: 12.5px; }
+.topbar-note { color: var(--muted); font-size: 12.5px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .tab-link { color: var(--muted); text-decoration: none; margin-right: 10px; padding: 4px 9px; border: 1px solid var(--border); border-radius: 7px; font-size: 12px; }
 .tab-link.active { color: var(--accent); border-color: var(--accent); }
 .app-status { color: var(--accent-2); font-family: var(--mono); font-size: 12px; }

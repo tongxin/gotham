@@ -235,12 +235,11 @@
   function renderKernels() {
     if (!last || !last.results.length) return;
     var r = last.results[0];
-    $('kernelLegend').innerHTML = Charts.kernelBars($('kernelChartPrefill'), r.phases.prefill ? r.phases.prefill.l2.kernels : []) ||
-      Charts.kernelBars($('kernelChartDecode'), r.phases.decode ? r.phases.decode.l2.kernels : []);
+    var legend = '';
     if (r.phases.prefill) {
       $('prefillKernelTitle').style.display = '';
       $('kernelChartPrefill').style.display = '';
-      Charts.kernelBars($('kernelChartPrefill'), r.phases.prefill.l2.kernels);
+      legend = Charts.kernelBars($('kernelChartPrefill'), r.phases.prefill.l2.kernels);
     } else {
       $('prefillKernelTitle').style.display = 'none';
       $('kernelChartPrefill').style.display = 'none';
@@ -248,11 +247,13 @@
     if (r.phases.decode) {
       $('decodeKernelTitle').style.display = '';
       $('kernelChartDecode').style.display = '';
-      Charts.kernelBars($('kernelChartDecode'), r.phases.decode.l2.kernels);
+      if (!legend) legend = Charts.kernelBars($('kernelChartDecode'), r.phases.decode.l2.kernels);
+      else Charts.kernelBars($('kernelChartDecode'), r.phases.decode.l2.kernels);
     } else {
       $('decodeKernelTitle').style.display = 'none';
       $('kernelChartDecode').style.display = 'none';
     }
+    $('kernelLegend').innerHTML = legend;
   }
 
   function renderTable() {
@@ -272,7 +273,7 @@
           '<td>' + ph + '</td>' +
           '<td>' + sig(l1.throughput, 4) + '</td>' +
           '<td>' + sig(l2.throughput, 4) + '</td>' +
-          '<td>' + (ratio >= 1 ? '×' + sig(ratio, 3) : '×' + sig(ratio, 3)) + '</td>' +
+          '<td>' + (ratio >= 1 ? '×' + sig(ratio, 3) + ' slower' : '×' + sig(ratio, 3) + ' faster') + '</td>' +
           '<td>' + fmtTime(l1.time) + '</td>' +
           '<td>' + fmtTime(l2.totalTime) + '</td>' +
           '<td>' + fmtPct(l2.utilization) + '</td>' +

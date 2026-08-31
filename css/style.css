@@ -37,6 +37,8 @@ body {
 .brand .logo { color: var(--accent); margin-right: 8px; }
 .brand .brand-sub { color: var(--muted); font-weight: 500; }
 .topbar-note { color: var(--muted); font-size: 12.5px; }
+.tab-link { color: var(--muted); text-decoration: none; margin-right: 10px; padding: 4px 9px; border: 1px solid var(--border); border-radius: 7px; font-size: 12px; }
+.tab-link.active { color: var(--accent); border-color: var(--accent); }
 .app-status { color: var(--accent-2); font-family: var(--mono); font-size: 12px; }
 .app-status.err { color: var(--danger); }
 
@@ -169,6 +171,9 @@ button.mini:hover { color: var(--text); border-color: var(--accent); }
 .chart svg { display: block; }
 .chart .axis { fill: var(--muted); font-size: 10.5px; font-family: var(--mono); }
 .chart .axis-title { fill: var(--muted); font-size: 11.5px; }
+.chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.chart-sub { margin: 0 0 6px; font-size: 11.5px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
+@media (max-width: 1200px) { .chart-grid { grid-template-columns: 1fr; } }
 
 .chart-tip {
   position: absolute;

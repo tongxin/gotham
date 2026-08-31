@@ -18,8 +18,8 @@ LIB := $(BUILD)/$(LIB_NAME)
 
 all: $(LIB)
 
-$(LIB): sim.cpp sim.hpp | $(BUILD)
-	$(CXX) $(CXXFLAGS) $(SHARED_FLAGS) -o $@ sim.cpp
+$(LIB): sim.cpp sim.hpp l2.cpp l2.hpp | $(BUILD)
+	$(CXX) $(CXXFLAGS) $(SHARED_FLAGS) -o $@ sim.cpp l2.cpp
 
 $(BUILD):
 	mkdir -p $(BUILD)

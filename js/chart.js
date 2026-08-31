@@ -273,10 +273,56 @@
     return legendItems;
   }
 
+  function kernelBars(container, kernels) {
+    container.innerHTML = '';
+    if (!kernels || !kernels.length) return '';
+    const W = Math.max(container.clientWidth || 900, 520);
+    const rowH = 40;
+    const H = kernels.length * rowH + 60;
+    const svg = el('svg', { viewBox: '0 0 ' + W + ' ' + H, width: '100%', height: '100%' }, container);
+    const labelW = 150;
+    const x0 = labelW + 12;
+    const x1 = W - 120;
+    const maxT = Math.max.apply(null, kernels.map(k => k.tTotal));
+    const segs = [
+      ['Compute', '#7aa2f7'],
+      ['DRAM', '#f7768e'],
+      ['SMEM', '#e0af68'],
+      ['L2', '#bb9af7'],
+    ];
+    const legendItems = segs.map(s =>
+      '<span class="lg"><span class="sw" style="background:' + s[1] + '"></span>' + s[0] + '</span>'
+    ).join('');
+    kernels.forEach((k, i) => {
+      const y = 34 + i * rowH;
+      const tx = el('text', { x: labelW - 10, y: y + 16, 'text-anchor': 'end', fill: '#d7dce8', 'font-size': 12, 'font-weight': 600 }, svg);
+      tx.textContent = k.name;
+      const parts = [
+        ['tCompute', '#7aa2f7'],
+        ['tDram', '#f7768e'],
+        ['tSmem', '#e0af68'],
+        ['tL2', '#bb9af7'],
+      ];
+      let x = x0;
+      for (const [key, color] of parts) {
+        const w = (k[key] / maxT) * (x1 - x0);
+        if (w > 0.2) el('rect', { x: x, y: y + 2, width: Math.max(w, 0.5), height: 20, rx: 2, fill: color, opacity: 0.92 }, svg);
+        x += w;
+      }
+      const lb = el('text', { x: x1 + 8, y: y + 16, fill: '#d7dce8', 'font-family': 'SFMono-Regular, Menlo, monospace', 'font-size': 11 }, svg);
+      lb.textContent = (k.tTotal * 1e3).toFixed(2) + ' ms';
+      const tagColor = k.bound === 'compute' ? '#9ece6a' : (k.bound === 'dram' ? '#f7768e' : (k.bound === 'l2' ? '#bb9af7' : '#e0af68'));
+      const tag = el('text', { x: x0, y: y - 6, fill: tagColor, 'font-size': 10, 'font-weight': 700 }, svg);
+      tag.textContent = k.bound.toUpperCase();
+    });
+    return legendItems;
+  }
+
   return {
     RooflineChart,
     memoryChart,
     throughputChart,
+    kernelBars,
     fmtSI,
     fmtBytes,
   };

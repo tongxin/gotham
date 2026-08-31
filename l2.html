@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GPU Roofline Simulator - L2 Kernel-Level</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="logo">▦</span> Roofline <span class="brand-sub">L2 · Kernel-Level Simulator</span></div>
+    <div class="topbar-note">
+      <a href="index.html" class="tab-link">L1 · Roofline</a>
+      <span class="tab-link active">L2 · Kernels</span>
+      <span id="appStatus" class="app-status">Connecting…</span>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <section class="side-section">
+        <div class="side-head">
+          <h3>Models</h3>
+          <div class="mini-btns">
+            <button id="modelAll" class="mini">all</button>
+            <button id="modelNone" class="mini">none</button>
+          </div>
+        </div>
+        <div id="modelList" class="model-list"></div>
+      </section>
+
+      <section class="side-section">
+        <h3>GPU</h3>
+        <select id="gpuSelect" class="select"></select>
+        <div id="gpuSpecs" class="specs"></div>
+      </section>
+
+      <section class="side-section">
+        <h3>Precision</h3>
+        <label class="field">Weights
+          <select id="precisionSelect" class="select"></select>
+        </label>
+        <label class="field">KV cache
+          <select id="kvPrecisionSelect" class="select"></select>
+        </label>
+      </section>
+
+      <section class="side-section">
+        <h3>Workload</h3>
+        <div class="seg" id="phaseSeg">
+          <button data-phase="prefill">Prefill</button>
+          <button data-phase="decode">Decode</button>
+          <button data-phase="both" class="active">Both</button>
+        </div>
+        <label class="field">Batch size <output id="bOut">1</output>
+          <input type="range" id="bSlider" min="0" max="10" value="0" step="1">
+        </label>
+        <label class="field">Sequence length <output id="sOut">2,048</output>
+          <input type="range" id="sSlider" min="7" max="14" value="11" step="1">
+        </label>
+        <label class="field">GPUs <output id="gOut">1</output>
+          <input type="range" id="gpuSlider" min="0" max="6" value="0" step="1">
+        </label>
+      </section>
+
+      <section class="side-section">
+        <h3>L2 options</h3>
+        <label class="check"><input type="checkbox" id="flashAttention" checked> FlashAttention (tiled)</label>
+        <label class="check"><input type="checkbox" id="recompute" checked> Activation recompute</label>
+        <label class="check"><input type="checkbox" id="fuseLayer" checked> Fuse layer (on-chip acts)</label>
+        <label class="field">L2 usable fraction <output id="l2Out">80%</output>
+          <input type="range" id="l2Slider" min="0" max="10" value="8" step="1">
+        </label>
+        <label class="field">Occupancy target (CTAs/SM) <output id="occOut">4</output>
+          <input type="range" id="occSlider" min="1" max="8" value="4" step="1">
+        </label>
+      </section>
+    </aside>
+
+    <main class="content">
+      <section class="cards" id="statCards"></section>
+
+      <section class="panel">
+        <h2>Kernel time breakdown (per layer, serial)</h2>
+        <div id="kernelLegend" class="legend"></div>
+        <div class="chart-grid">
+          <div>
+            <h3 class="chart-sub" id="prefillKernelTitle">Prefill kernels</h3>
+            <div id="kernelChartPrefill" class="chart chart-sm"></div>
+          </div>
+          <div>
+            <h3 class="chart-sub" id="decodeKernelTitle">Decode kernels</h3>
+            <div id="kernelChartDecode" class="chart chart-sm"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>L1 vs L2 comparison</h2>
+        <div id="resultsTable" class="table-wrap"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Memory footprint per GPU</h2>
+        <div id="memoryChart" class="chart chart-sm"></div>
+      </section>
+
+      <section class="panel">
+        <h2>What L2 models</h2>
+        <div class="math">
+          <p>L2 keeps the L1 roofline ceilings but decomposes one transformer layer
+          into its kernels (QKV projection, attention scores, PV, output projection,
+          MLP — dense or routed MoE, plus the vocab logits) and gives each kernel
+          three resource clocks:</p>
+          <pre>t_kernel = max(FLOPs_G / (P · occupancy),
+                DRAM_G / b_eff,
+                SMEM_G / SMEM_bandwidth)</pre>
+          <p><code>occupancy</code> is the fraction of the target CTAs/SM that fit given
+          per-SM shared memory (tile size), registers (regs/thread), threads/block, and
+          TMEM (Blackwell accumulators, used for FP8/INT4). DRAM traffic is reduced by an
+          L2 reuse model: <code>hit = min(1, L2_usable / bytes_touched_per_layer)</code>.
+          FlashAttention removes the S×S score matrices from HBM and instead pays SMEM
+          tile traffic (with a TMEM discount on Blackwell). Activations can be fused
+          on-chip per layer and checkpointed (<code>recompute</code>) for the memory
+          budget. MoE pays the router plus top-k experts' FLOPs and weights.</p>
+          <p>Layer time is the serial sum of kernel times; total time is
+          <code>L · layer_time + logits</code>. Kernel times are deliberately
+          conservative (no inter-kernel overlap) and all microarchitectural numbers are
+          first-pass estimates to be refined. Full equations:
+          <a href="docs/simulation-methodology.md" target="_blank" rel="noopener" class="ref-link">docs/simulation-methodology.md</a></p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="js/chart.js"></script>
+  <script src="js/app_l2.js"></script>
+</body>
+</html>

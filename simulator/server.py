@@ -6,7 +6,7 @@ import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
-from . import core, data
+from . import core, core_l2, data
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -115,6 +115,25 @@ def _simulate_payload(payload):
     }
 
 
+def _simulate_l2_payload(payload):
+    cfg = payload.get("cfg") or {}
+    gpu = data.get_gpu(payload.get("gpu") or "h100")
+    model_ids = payload.get("models") or []
+    if not model_ids:
+        raise ValueError("no models selected")
+    models = [data.get_model(mid) for mid in model_ids]
+    phases = ["prefill", "decode"] if cfg.get("phase", "both") == "both" else [cfg.get("phase", "prefill")]
+    results = []
+    for m in models:
+        entry = {"model": m, "phases": {}}
+        for ph in phases:
+            l2 = core_l2.simulate_l2(m, gpu, cfg, ph)
+            l1 = core.simulate(m, gpu, dict(cfg, phase=ph))
+            entry["phases"][ph] = {"l2": l2, "l1": l1}
+        results.append(entry)
+    return {"gpu": gpu, "coreVersion": core.version(), "results": results, "phases": phases}
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "GothamSim/0.1"
 
@@ -158,13 +177,17 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, fh.read(), MIME.get(ext, "application/octet-stream"))
 
     def do_POST(self):
-        if urlparse(self.path).path != "/api/simulate":
+        path = urlparse(self.path).path
+        if path not in ("/api/simulate", "/api/simulate_l2"):
             self._send_error_json(404, "not found")
             return
         try:
             length = int(self.headers.get("Content-Length", 0))
             payload = json.loads(self.rfile.read(length) or b"{}")
-            self._send_json(_simulate_payload(payload))
+            if path == "/api/simulate":
+                self._send_json(_simulate_payload(payload))
+            else:
+                self._send_json(_simulate_l2_payload(payload))
         except (KeyError, ValueError, json.JSONDecodeError) as exc:
             self._send_error_json(400, str(exc))
         except Exception as exc:  # noqa: BLE001 - report any server-side failure

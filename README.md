@@ -8,6 +8,15 @@ by a local API server (`simulator/server.py`).
 Full methodology — every knob, constraint, and equation that shapes the
 roofline — is documented in [docs/simulation-methodology.md](docs/simulation-methodology.md).
 
+Two simulation levels are available:
+
+- **L1 (roofline)** — `index.html`, coarse `min(peak, bandwidth × I)` ceilings.
+- **L2 (kernel-level)** — `l2.html`, decomposes a transformer layer into its
+  kernels (attention, SwiGLU/MoE, vocab logits) and clocks each against tensor
+  compute (occupancy-limited), HBM (L2-reuse-adjusted), and SMEM bandwidth,
+  including TMEM on Blackwell and FlashAttention tiling. The L1 core is
+  untouched; L2 is additive (`cpp/l2.cpp`, `/api/simulate_l2`).
+
 ## Run it
 
 ```sh
@@ -48,7 +57,11 @@ simulator/server.py  stdlib HTTP server: static UI + /api/data + /api/simulate
 simulator/cli.py     command-line access to the same core
 simulator/test_core.py  sanity checks (python3 simulator/test_core.py)
 js/app.js            UI state + fetch/render (no simulation math)
+js/app_l2.js         L2 UI (kernel breakdown, L1-vs-L2 comparison)
 js/chart.js          SVG chart renderers (roofline, memory, throughput)
+cpp/l2.cpp           L2 kernel-level core (C ABI, additive)
+simulator/core_l2.py ctypes binding to the L2 core
+l2.html              L2 simulation page
 ```
 
 There is deliberately **no math in JavaScript** — the browser only formats and

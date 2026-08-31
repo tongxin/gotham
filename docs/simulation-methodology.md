@@ -263,3 +263,91 @@ Every number on screen is produced by the C++ core from the JSON config sent to
 python3 -m simulator.cli --model glm-5.2 --gpu b300 --phase both \
   --batch 1 --seq 4096 --precision fp8 --gpus 8
 ```
+
+---
+
+# Part II — L2: kernel-level simulation
+
+L1 answers "what is the best possible?". L2 answers "what fraction of it can a
+transformer layer actually reach?" by decomposing one layer into its kernels and
+clocks each kernel against three on-chip resources. The L1 core is untouched;
+L2 is an additive model (`cpp/l2.cpp`, `simulator/core_l2.py`,
+`POST /api/simulate_l2`, UI at `l2.html`).
+
+## L2 abstractions
+
+| Abstraction | What it captures | Knobs |
+|---|---|---|
+| **Per-kernel decomposition** | qkv_proj, attn_scores, attn_pv, out_proj, mlp (dense or router+experts), kv_write, logits | model's `ffn`, `experts`, `topk`, `shared`, `vocab` |
+| **Four resource clocks** | tensor compute, HBM bandwidth, L2 bandwidth, SMEM bandwidth | — |
+| **Occupancy** | CTAs/SM limited by SMEM tile, registers, threads, TMEM; utilization = fitted CTAs ÷ target | `threadsPerBlock`, `regsPerThread`, `occupancyTarget`, tile sizes |
+| **SMEM traffic** | FlashAttention tile loads (Q/K/V + scores), per-head; TMEM discounts scores/accumulators on Blackwell | `flashAttention`, `qTile`, `kTile` |
+| **L2 cache reuse** | hit = min(1, L2_usable / bytes_touched_per_layer); scales every kernel's DRAM bytes | `l2UsableFrac` |
+| **Model inner workings** | SwiGLU width F, routed experts × top-k, shared experts, vocab logits | model catalog |
+| **Activation strategy** | fused per-layer on-chip acts; checkpointing for memory | `fuseLayer`, `recompute` |
+
+## L2 equations
+
+```text
+Layer kernels (prefill, T = B·S):
+  qkv_proj      FLOPs = 2·T·H·(H + 2·H_kv)
+  attn_scores   FLOPs = 2·T·S·H          DRAM = KV_write (+ 4·T·S·b if not flash)
+  attn_pv       FLOPs = 2·T·S·H_kv
+  out_proj      FLOPs = 2·T·H²
+  mlp (dense)   FLOPs = 6·T·H·F
+  mlp (MoE)     router: 2·T·H·E   experts: k·6·T·H·F + shared·6·T·H·F
+  logits        FLOPs = 2·T·V·H          (once, not per layer)
+
+Decode is the same with T = B and
+  attn_scores   FLOPs = 2·B·S·H          DRAM = KV_read = 2·B·S·H_kv·b_kv
+
+Per-kernel clocks (all divided by G for tensor-parallel shards; L2 hit is
+computed per GPU: `hit = min(1, L2_usable / (bytes_touched_per_layer / G))`):
+  t_compute = FLOPs_G / (P · occupancy)      occupancy ∈ (0, 1]
+  t_dram    = DRAM_G · (1 − l2_hit) / b_eff
+  t_l2      = DRAM_G · l2_hit / L2_bandwidth
+  t_smem    = SMEM_G / (SMs · f_clk · SMEM_BW_per_clk)
+  t_kernel  = max(t_compute, t_dram, t_l2, t_smem)
+  layer_time = Σ t_kernel                     (serial, conservative)
+  total_time = L · layer_time + t_logits
+```
+
+The occupancy limiter per kernel:
+
+```text
+blocks = min(floor(SMEM_per_SM / tile_SMEM),
+             floor(regs_per_SM / (regs_per_thread·4·threads_per_block)),
+             floor(max_threads_per_SM / threads_per_block),
+             max_blocks_per_SM,
+             floor(TMEM_per_SM / (128·128·4)) if FP8/INT4 and TMEM exists)
+occupancy = min(1, blocks / occupancy_target_blocks)
+```
+
+FlashAttention SMEM traffic (per layer, per head `hd = H/heads`):
+
+```text
+SMEM ≈ heads · (S/q_tile) · [ q_tile·hd·b
+       + (S/k_tile) · (2·k_tile·hd·b + 2·q_tile·k_tile·4) ]
+× 0.25 on Blackwell (scores/accumulators live in TMEM, FA4-style)
+```
+
+Memory per GPU adds activation checkpointing:
+
+```text
+act_per_layer = (flash ? 2 : 4)·B·S·H·b + (flash ? 0 : 2·B·S²·b)   (prefill)
+act_G         = act_per_layer · (recompute ? 1 : L) / G
+mem_G         = W/G + KV/G + act_G
+```
+
+## What L2 adds over L1 (and what it still ignores)
+
+Added: vocab-logits FLOPs/weights (L1 ignored them — they dominate small-batch
+prefill), per-kernel bound attribution (compute/DRAM/SMEM), occupancy from
+SMEM/registers/threads/TMEM, L2 weight/KV reuse, FlashAttention vs materialized
+attention, MoE routing, and activation checkpointing.
+
+Still ignored (deliberate, L3 territory): inter-GPU communication
+(all-gather / reduce-scatter / expert-parallel), kernel overlap/fusion across
+the serial sum, warp-level scheduling, and exact cache replacement. All
+microarchitectural numbers in the catalog (SMs, clocks, SMEM, L2, TMEM) are
+first-pass estimates from vendor material and benchmarks, marked for refinement.

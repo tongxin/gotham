@@ -160,30 +160,25 @@
     var seq = ++requestSeq;
     clearTimeout(timer);
     timer = setTimeout(function () {
-      fetch('/api/simulate_l2', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          models: state.models,
-          gpu: state.gpuId,
-          cfg: {
-            phase: state.phase,
-            B: state.B,
-            S: state.S,
-            gpus: state.gpus,
-            precision: state.precision,
-            kvPrecision: state.kvPrecision,
-            computeScale: state.computeScale,
-            bandwidthScale: state.bandwidthScale,
-            flashAttention: state.flashAttention,
-            recompute: state.recompute,
-            fuseLayer: state.fuseLayer,
-            l2UsableFrac: state.l2UsableFrac,
-            occupancyTarget: state.occupancyTarget,
-          },
-        }),
+      SimAPI.simulateL2({
+        models: state.models,
+        gpu: state.gpuId,
+        cfg: {
+          phase: state.phase,
+          B: state.B,
+          S: state.S,
+          gpus: state.gpus,
+          precision: state.precision,
+          kvPrecision: state.kvPrecision,
+          computeScale: state.computeScale,
+          bandwidthScale: state.bandwidthScale,
+          flashAttention: state.flashAttention,
+          recompute: state.recompute,
+          fuseLayer: state.fuseLayer,
+          l2UsableFrac: state.l2UsableFrac,
+          occupancyTarget: state.occupancyTarget,
+        },
       })
-        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
         .then(function (d) {
           if (seq !== requestSeq) return;
           last = d;
@@ -315,9 +310,8 @@
   }
 
   function init() {
-    setStatus('Connecting to simulation server…');
-    fetch('/api/data')
-      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    setStatus('Connecting to simulation core…');
+    SimAPI.getCatalog()
       .then(function (d) {
         catalog = d;
         buildGpuSelect();
@@ -327,7 +321,7 @@
         refresh();
       })
       .catch(function () {
-        setStatus('Simulation server unreachable — run: python3 -m simulator.server', 'err');
+        setStatus('Simulation core unavailable — start the server or fix the WASM build', 'err');
       });
     window.addEventListener('resize', function () { if (last) renderAll(); });
   }

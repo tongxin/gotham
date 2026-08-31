@@ -26,6 +26,34 @@ python3 -m simulator.server # serves the UI + API at http://127.0.0.1:8765
 
 Then open http://127.0.0.1:8765. No pip installs, no npm, no build step for the UI.
 
+## Deploy to GitHub Pages (no server required)
+
+The C++ core is compiled to WebAssembly, so the whole app runs statically in the
+browser — no Python server needed on the hosted site. Pushing to `main` triggers
+`.github/workflows/pages.yml`, which builds `wasm/gotham.js` with Emscripten,
+exports the catalog, and deploys to GitHub Pages:
+
+```sh
+gh api -X POST repos/tongxin/gotham/pages -f "build_type=workflow"   # once
+git push origin main
+```
+
+The site appears at https://tongxin.github.io/gotham/. To build and test the
+WASM core locally:
+
+```sh
+em++ -O2 -std=c++17 -s MODULARIZE=1 -s EXPORT_NAME=createGothamModule \
+  -s ENVIRONMENT=web,node \
+  -s EXPORTED_FUNCTIONS='["_gotham_wasm_simulate","_gotham_wasm_l2_simulate","_gotham_wasm_memory","_gotham_wasm_peak_flops","_gotham_version","_malloc","_free"]' \
+  -s ALLOW_MEMORY_GROWTH=1 \
+  -o wasm/gotham.js cpp/sim.cpp cpp/l2.cpp cpp/wasm_glue.cpp
+python3 tools/export_data.py
+node tools/test_wasm.js
+```
+
+`js/simapi.js` transparently picks the Python server when it is running and the
+in-browser WASM core otherwise, so the same pages work in both modes.
+
 ## What you can do
 
 - **Compare models** — select multiple models (dense and MoE: LLaMA, GPT, GLM-5.2/5.3,

@@ -1,4 +1,7 @@
 __pycache__/
 *.pyc
 cpp/build/
+wasm/gotham.js
+wasm/gotham.wasm
+_site/
 .DS_Store

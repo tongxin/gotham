@@ -1,0 +1,45 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: emscripten/emsdk:latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build WASM core
+        run: |
+          em++ -O2 -std=c++17 \
+            -s MODULARIZE=1 -s EXPORT_NAME=createGothamModule \
+            -s ENVIRONMENT=web,node \
+            -s EXPORTED_FUNCTIONS='["_gotham_wasm_simulate","_gotham_wasm_l2_simulate","_gotham_wasm_memory","_gotham_wasm_peak_flops","_gotham_version","_malloc","_free"]' \
+            -s ALLOW_MEMORY_GROWTH=1 \
+            -o wasm/gotham.js cpp/sim.cpp cpp/l2.cpp cpp/wasm_glue.cpp
+
+      - name: Export catalog
+        run: python3 tools/export_data.py
+
+      - name: Stage static site
+        run: |
+          mkdir -p _site
+          cp -r index.html l2.html data.json css js wasm docs _site/
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - uses: actions/deploy-pages@v4

@@ -161,31 +161,23 @@
     var seq = ++requestSeq;
     clearTimeout(timer);
     timer = setTimeout(function () {
-      fetch('/api/simulate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          models: state.models,
-          gpu: state.gpuId,
-          cfg: {
-            phase: state.phase,
-            B: state.B,
-            S: state.S,
-            gpus: state.gpus,
-            precision: state.precision,
-            kvPrecision: state.kvPrecision,
-            computeScale: state.computeScale,
-            bandwidthScale: state.bandwidthScale,
-            sweep: state.showSweep,
-            showPrecisionCeilings: state.showPrecisionCeilings,
-            showOtherCeilings: state.showOtherCeilings,
-          },
-        }),
+      SimAPI.simulate({
+        models: state.models,
+        gpu: state.gpuId,
+        cfg: {
+          phase: state.phase,
+          B: state.B,
+          S: state.S,
+          gpus: state.gpus,
+          precision: state.precision,
+          kvPrecision: state.kvPrecision,
+          computeScale: state.computeScale,
+          bandwidthScale: state.bandwidthScale,
+          sweep: state.showSweep,
+          showPrecisionCeilings: state.showPrecisionCeilings,
+          showOtherCeilings: state.showOtherCeilings,
+        },
       })
-        .then(function (r) {
-          if (!r.ok) throw new Error('HTTP ' + r.status);
-          return r.json();
-        })
         .then(function (d) {
           if (seq !== requestSeq) return;
           last = d;
@@ -352,9 +344,8 @@
 
   function init() {
     rooflineChart = new Charts.RooflineChart($('roofline'), $('rooflineTip'));
-    setStatus('Connecting to simulation server…');
-    fetch('/api/data')
-      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    setStatus('Connecting to simulation core…');
+    SimAPI.getCatalog()
       .then(function (d) {
         catalog = d;
         buildGpuSelect();
@@ -364,11 +355,11 @@
         refresh();
       })
       .catch(function () {
-        setStatus('Simulation server unreachable — run: python3 -m simulator.server', 'err');
+        setStatus('Simulation core unavailable — start the server or fix the WASM build', 'err');
         ['roofline', 'memoryChart', 'throughputChart'].forEach(function (id) {
-          $(id).innerHTML = '<div class="empty">Waiting for the simulation server…</div>';
+          $(id).innerHTML = '<div class="empty">Waiting for the simulation core…</div>';
         });
-        $('resultsTable').innerHTML = '<div class="empty">Waiting for the simulation server…</div>';
+        $('resultsTable').innerHTML = '<div class="empty">Waiting for the simulation core…</div>';
       });
     window.addEventListener('resize', function () { if (last) renderAll(); });
   }

@@ -76,9 +76,9 @@
     const pm = allocDoubles(mod, modelArr(m));
     const pg = allocDoubles(mod, gpu1Arr(gpu));
     const pc = allocDoubles(mod, cfg1Arr(cfg));
-    const po = mod._malloc(35 * 8);
+    const po = mod._malloc(37 * 8);
     const ok = mod._gotham_wasm_simulate(pm, pg, pc, po);
-    const out = ok ? readDoubles(mod, po, 35) : null;
+    const out = ok ? readDoubles(mod, po, 37) : null;
     mod._free(pm); mod._free(pg); mod._free(pc); mod._free(po);
     return out;
   }
@@ -236,6 +236,8 @@
         model: m,
         prefill: phaseDict(out, 0),
         decode: phaseDict(out, 13),
+        decodeWBytes: out[35],
+        decodeStreamedB: out[36],
         memory_per_gpu: {
           weights: mem.weights / g,
           kv: mem.kv / g,
@@ -263,6 +265,8 @@
       peak: first[31],
       bw: first[32],
       ridge: first[33],
+      decodeWBytes: first[35],
+      decodeStreamedB: first[36],
       coreVersion: wasmVersion(mod),
       ceilings: buildCeilings(catalog, gpu, cfg, mod, gpuArr),
       results,

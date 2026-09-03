@@ -25,6 +25,10 @@ Left of the ridge (`I < R`) the workload is **memory-bound** and adding compute
 peak does nothing; right of the ridge (`I > R`) it is **compute-bound** and
 adding bandwidth does nothing. The whole simulator is just the machinery for
 computing `I` honestly for a given model, GPU, precision, and workload shape.
+Two operating points are offered: **spec** (100% of datasheet peaks, the classic
+upper bound) and **realistic** (the same ceilings derated by sustained
+efficiency factors `e_c`, `e_b` — §13). Everything else in this part applies to
+both modes.
 
 ## 2. Symbols
 
@@ -42,14 +46,18 @@ computing `I` honestly for a given model, GPU, precision, and workload shape.
 | `G` | GPU count (tensor-parallel shards) | user knob |
 | `prec` | weight precision | user knob |
 | `kv_prec` | KV cache precision | user knob |
-| `c_s` | compute-scale multiplier (derating) | user knob |
-| `w_s` | bandwidth-scale multiplier (derating) | user knob |
+| `e_c` | sustained compute fraction of spec peak | Advanced slider / realistic preset |
+| `e_b` | achieved DRAM fraction of spec bandwidth | Advanced slider / realistic preset |
+| `E` | routed (MoE) experts | model catalog |
+| `k` | experts active per token (top-k) | model catalog |
 | `b_elem` | bytes per weight element | precision table |
 | `q` | quantization metadata overhead | precision table |
 | `b_kv` | bytes per KV-cache element | KV precision |
 | `W` | total weight bytes | derived |
-| `P` | tensor-core peak for `prec` (× `c_s`) | GPU catalog + precision |
-| `b_eff` | effective DRAM bandwidth `= b × w_s` | GPU catalog + knob |
+| `W_shared` | estimated always-active (non-routed) weight bytes | derived |
+| `W_stream(B)` | weight bytes streamed per decode step at batch `B` | derived (§4, §14) |
+| `P` | tensor-core peak for `prec` (× `e_c`) | GPU catalog + precision + knob |
+| `b_eff` | effective DRAM bandwidth `= b × e_b` | GPU catalog + knob |
 | `R` | ridge point `= P / b_eff` | derived |
 | `M` | per-GPU HBM capacity | GPU catalog |
 
@@ -103,14 +111,19 @@ KV_read_token  = 2 · L · S · H_kv · b_kv # read the full cache during decode
 ACT_token      = 16 · H                  # rough activation traffic per token
 
 bytes_prefill = W + B · S · (KV_write_token + ACT_token)
-bytes_decode  = W + B · (KV_read_token + KV_write_token + ACT_token)                     # per step
+bytes_decode  = W_stream(B) + B · (KV_read_token + KV_write_token + ACT_token)            # per step
 ```
 
-**Constraint / assumption:** in decode, the full weight set `W` is read from
-DRAM once per step and amortized over the batch `B`; no L2/weight-reuse credit is
-taken. In prefill, `W` is read once for the whole `B·S` batch, so it is fully
-amortized there. The `16·H` activation term is an acknowledged estimate
-(FlashAttention-style, per token), not a cycle-accurate activation budget.
+**Constraint / assumption:** in decode, the *union* of weights the batch needs is
+read from DRAM once per step — `W_stream(B)`, derived in §14. For dense models
+`W_stream(B) = W` for every `B`, so the classic single weight pass per step is
+unchanged. MoE models stream only the experts the batch routes to, so
+`W_stream(B)` grows from roughly the per-token active set at `B = 1` toward the
+full `W` as the batch touches more experts. No L2/weight-reuse credit is taken
+beyond that routing union. In prefill, `W` is read once for the whole `B·S`
+batch, so it is fully amortized there. The `16·H` activation term is an
+acknowledged estimate (FlashAttention-style, per token), not a cycle-accurate
+activation budget.
 
 ## 5. Tensor-parallel sharding (`G` GPUs)
 
@@ -174,8 +187,10 @@ checkpointing-aware exact budget.
 | **Batch `B`** | `bytes` amortization, `KV_G` | Decode: `B↑` amortizes `W` → `I` rises toward the ridge. Prefill: `W` already amortized; `I` barely moves. KV cache grows linearly |
 | **Sequence `S`** | attention terms, KV read | Prefill: `S²` FLOPs vs linear bytes → `I` climbs steeply. Decode: per-token FLOPs and KV read both grow linearly in `S` → `I` saturates, latency grows linearly |
 | **GPU count `G`** | §5, §7 | Point stays put; aggregate throughput ×`G`; per-GPU memory ↓ (fixes OOM) |
-| **Compute scale `c_s`** | `P = P_prec · c_s` | Lowers the compute ceiling; ridge moves left; compute-bound points drop |
-| **Bandwidth scale `w_s`** | `b_eff = b · w_s` | Rotates the memory ceiling down; ridge moves right; memory-bound points drop |
+| **Mode / efficiency presets** | §1, §13 | `spec` = 100% datasheet peaks; `realistic` starts from calibrated `e_c`/`e_b` defaults (§13) |
+| **Compute efficiency `e_c`** | `P = P_prec · e_c` | Lowers the compute ceiling; ridge moves left; compute-bound points drop |
+| **Bandwidth efficiency `e_b`** | `b_eff = b · e_b` | Rotates the memory ceiling down; ridge moves right; memory-bound points drop |
+| **MoE routing (`E`, `k`)** | `W_stream(B)`, §14 | Shrinks decode weight traffic at small `B` (active-expert streaming); saturated at large `B` |
 | **Sweep toggle** | none (diagnostic) | Traces decode points for `B = 1 … 1024`, showing the memory→compute transition |
 
 ### Why decode `I` rises with batch
@@ -183,13 +198,15 @@ checkpointing-aware exact budget.
 For decode at batch `B`, with `W` amortized:
 
 ```text
-I_decode ≈ (F_token + 2·S·L·(H + H_kv)) / (W/B + 2·L·S·H_kv·b_kv + 2·L·H_kv·b_kv + 16·H)
+I_decode ≈ (F_token + 2·S·L·(H + H_kv)) / (W_stream(B)/B + 2·L·S·H_kv·b_kv + 2·L·H_kv·b_kv + 16·H)
 ```
 
-At `B = 1`, `W` dominates the denominator and `I ≈ 1 FLOP/B` for a typical FP16
-model — deep in the memory-bound regime, which is why single-stream decode on
-H100 runs at roughly DRAM bandwidth. As `B → 1024`, `W/B → 0` and `I` approaches
-the compute-side ratio; the sweep curve on the chart shows this trajectory.
+At `B = 1`, `W_stream(1)` dominates the denominator — for dense models that is
+`W`, for MoE models it is the active expert set — so `I` is small and decode is
+deep in the memory-bound regime. As `B → 1024`, dense `W_stream/B → 0`; for MoE
+models `W_stream(B)` itself saturates toward `W` (§14), so the denominator only
+falls as fast as the routing union fills. Either way `I` climbs toward the
+compute-side ratio, and the sweep curve on the chart shows the trajectory.
 
 ## 9. Derived ceilings drawn on the chart
 
@@ -206,7 +223,7 @@ separate model is needed.
 ## 10. Worked example — LLaMA-3 8B on H100, FP16, `B=1, S=2048`
 
 ```text
-N=8.03e9  N_active=8.03e9  L=32  H=4096  h=h_kv=32 → H_kv=4096
+N=8.03e9  N_active=8.03e9  L=32  H=4096  h=32  h_kv=8 → H_kv=1024
 W = 8.03e9 · 2 = 16.06 GB
 P = 989.5 TFLOPS   b_eff = 3.35 TB/s   R = 295.4 FLOP/B
 ```
@@ -214,25 +231,33 @@ P = 989.5 TFLOPS   b_eff = 3.35 TB/s   R = 295.4 FLOP/B
 **Prefill** (2048 tokens):
 
 ```text
-FLOPs = 2048·2·8.03e9 + 2·2048²·32·(4096+4096) = 35.09e12
-bytes = 16.06e9 + 2048·(2·32·4096·2 + 16·4096) = 17.27 GB
-I     = 2032 FLOP/B  →  I > R  →  compute-bound
+FLOPs = 2048·2·8.03e9 + 2·2048²·32·(4096+1024) = 34.27e12
+bytes = 16.06e9 + 2048·(2·32·1024·2 + 16·4096) = 16.46 GB
+I     = 2081 FLOP/B  →  I > R  →  compute-bound
 A     = 989.5 TFLOPS
-t     = 35.09e12 / 989.5e12 = 35.5 ms
-t/s   = 2048 / 35.5 ms ≈ 57.7k tok/s
+t     = 34.27e12 / 989.5e12 = 34.6 ms
+t/s   = 2048 / 34.6 ms ≈ 59.1k tok/s
 ```
 
 **Decode** (one step, 1 token):
 
 ```text
-FLOPs = 2·8.03e9 + 2·2048·32·8192 = 17.13e9
-bytes = 16.06e9 + (2·2048·32·4096·2 + 2·32·4096·2 + 16·4096) ≈ 17.13 GB
-I     = 1.0 FLOP/B  →  I < R  →  memory-bound
-A     = 3.35 TFLOPS (bandwidth)
-t     = 17.13e9 / 3.35e12 = 5.11 ms/step → ≈ 196 tok/s
+FLOPs = 2·8.03e9 + 2·2048·32·(4096+1024) = 16.73e9
+bytes = W_stream(1) + (2·2048·32·1024·2 + 2·32·1024·2 + 16·4096) ≈ 16.33 GB
+I     = 1.02 FLOP/B  →  I < R  →  memory-bound
+A     = b_eff · I ≈ 3.43 TFLOPS (bandwidth)
+t     = 16.33e9 / 3.35e12 = 4.87 ms/step → ≈ 205 tok/s  (spec peaks)
 ```
 
-**Memory:** `16.06 GB (W) + 1.07 GB (KV) + 0.13 GB (ACT) = 17.3 GB ≤ 80 GB` ✓
+Under the **realistic** preset (`e_c = 0.70`, `e_b = 0.75`) the same decode step
+takes `4.87 / 0.75 ≈ 6.50 ms` → ≈ 154 tok/s. That is within a few percent of the
+vLLM single-request measurements used on the Validation page (151–156 tok/s for
+Llama-3.1-8B FP16 on one H100), which is exactly the regime the realistic preset
+is calibrated for.
+
+```text
+Memory: 16.06 GB (W) + 0.27 GB (KV) + 0.13 GB (ACT) = 16.46 GB ≤ 80 GB ✓
+```
 
 This is the canonical pattern: prefill sits on the compute ceiling, decode sits
 on the memory ceiling, and only batch scaling moves decode off the wall.
@@ -250,9 +275,14 @@ on the memory ceiling, and only batch scaling moves decode off the wall.
   the model conservative for high-reuse workloads.
 - **Activation traffic is an estimate** (`16·H` per token, `16·B·S·H` buffer),
   not a per-layer checkpointing analysis.
-- **Peak-vs-sustained.** Spec-sheet peaks are used; the compute/bandwidth derating
-  sliders exist precisely to approximate sustained performance (e.g. ~70–75% MFU
-  on Hopper).
+- **Peak-vs-sustained.** Spec-sheet peaks are used in `spec` mode. The
+  `realistic` preset applies calibrated `e_c`/`e_b` factors (§13) — sustained
+  kernels never hit datasheet numbers (typical H100 decode implies ~73–75% of
+  HBM, prefill GEMMs ~60–75% MFU) — and the Validation page quantifies what
+  remains.
+- **Fixed per-step overhead is not modeled at L1.** At batch 1 the measured ITL
+  contains kernel-dispatch/sampler overhead on top of DRAM streaming; this is
+  why single-stream rows still over-predict even in realistic mode (§15).
 
 ## 12. Reproducing any chart value
 
@@ -262,6 +292,123 @@ Every number on screen is produced by the C++ core from the JSON config sent to
 ```sh
 python3 -m simulator.cli --model glm-5.2 --gpu b300 --phase both \
   --batch 1 --seq 4096 --precision fp8 --gpus 8
+```
+
+## 13. Realistic operating point — efficiency factors
+
+Two knobs convert the spec-sheet analysis into a sustained-performance analysis:
+
+```text
+P     = P_spec(prec) · e_c
+b_eff = b_spec · e_b
+```
+
+`e_c` and `e_b` default to **1.0 in `spec` mode** (the classic upper bound) and
+to calibrated values in **`realistic` mode**:
+
+| Factor | Realistic default | Meaning | Basis |
+|---|---|---|---|
+| `e_c` | 0.70 | sustained tensor-core fraction of the datasheet peak | prefill GEMM MFU observed in inference engines (~55–75%); validation rows on the concurrency-8 run |
+| `e_b` | 0.75 | achieved HBM fraction during decode | implied bandwidth from vLLM single-request Llama-3.1-8B measurements on H100 (~73–75%); engine kernels typically 60–85% |
+
+Both are Advanced-slider overrides in the UI (0.5×–2× of spec), so a user can
+always return to spec peaks with the **Spec peak** button. The defaults live in
+`simulator/data.py` (`REALISTIC`) and travel through the exported catalog so the
+WASM and server modes stay identical. They are deliberately *not* per-model
+constants: efficiency is workload- and engine-dependent, and the Validation page
+reports the implied efficiency of every measured row so users can see the spread
+(0.15 for a batch-1 MoE, 0.51 for the B200/FlashInfer measurement, ~0.73–0.75
+for tuned H100 decode).
+
+## 14. MoE decode weight streaming
+
+Dense decode rereads the full weight set `W` once per step. An expert-parallel
+MoE only rereads the experts the current batch routes to. With `E` routed
+experts and top-`k` routing, `B` tokens hit an expected
+`E·(1 − (1 − k/E)^B)` distinct experts, so the simulator streams:
+
+```text
+W_stream(B) = (W_shared + W_exp · (1 − (1 − k/E)^B)) · b_elem · q
+W_shared    = W_exp-est + always-active weights (attention, shared experts, ...)
+```
+
+Model cards do not publish the shared/routed split, so it is estimated from the
+catalog totals: `N_active ≈ N_shared + (k/E)·N_exp`, giving
+
+```text
+N_shared ≈ (N_active − (k/E)·N) / (1 − k/E)
+N_exp    = N − N_shared
+```
+
+Properties:
+
+- `B = 1`: `W_stream ≈ N_active·b_elem·q` — a single token reads its top-k
+  experts, not all of them. This is the main L1 correction for MoE decode.
+- `B → ∞`: `W_stream → W` — a saturated batch touches every expert and the
+  decode cost returns to the dense-style full weight pass.
+- Total `W` still governs prefill DRAM and the memory-capacity check (§7).
+
+Example — GLM-5.3-Flash on H200 (320B total, 18B active, `E=288`, `k=8`, FP8):
+
+```text
+k/E = 1/36
+N_shared ≈ (18 − 320/36) / (1 − 1/36) ≈ 9.4B
+W_stream(1) ≈ (9.4 + (320−9.4)/36) · 1 B/param ≈ 18 GB      # per step, all GPUs
+W_stream(1024) ≈ 320 GB                                     # batch saturates
+```
+
+At `B=1` the memory-bound floor is therefore ~18 GB per step (≈0.9 ms across
+4×H200), not 320 GB. The measured single-stream rate (163 tok/s, ~6.1 ms/token)
+is ~6× above that floor — the difference is per-layer expert all-to-all latency,
+which L1 deliberately does not model (see §15).
+
+## 15. Validation against measured benchmarks
+
+Measured records live in `simulator/validation_data.py`; every row pins one
+published number to a catalog model + GPU + exact config (engine, version,
+precision, batch, sequence lengths, URL, date). `python3 -m simulator.validate`
+replays each record through the core in both modes and writes
+`benchmarks/validation_report.json`; the **Validation** page in the UI performs
+the same replay (server or WASM core) and renders it interactively.
+
+**Error definition**
+
+```text
+signed error = (predicted − measured) / measured      # + means over-prediction
+MAPE         = mean |signed error| over comparable decode rows
+implied e_b  = bytes_per_step / (measured_step_time · G · b_spec)
+```
+
+Rows are tagged by comparability:
+
+| Tag | Meaning | In MAPE? |
+|---|---|---|
+| `decode` | decode-only steady-state (single stream or fixed concurrency) | yes |
+| `composite_serial` | end-to-end run modeled as `ceil(N/B)` serial prefill+decode waves | no (reported separately) |
+| `reference` | scheduler/engine-level result (unpublished concurrency) | no |
+
+Current headline results (report regenerated 2026-09-03):
+
+| Record | Measured | Spec pred | Spec err | Realistic pred | Realistic err | Implied `e_b` |
+|---|---|---|---|---|---|---|
+| vLLM Llama-3.1-8B H100, BF16 KV, B=1 | 6.47 ms ITL | 4.83 ms | −25% | 6.43 ms | −0.6% | 0.75 |
+| vLLM Llama-3.1-8B H100, FP8 KV, B=1 | 6.60 ms ITL | 4.81 ms | −27% | 6.41 ms | −2.8% | 0.73 |
+| vLLM Llama-3.1-8B B200, FP8 KV, B=1 | 3.97 ms ITL | 2.01 ms | −49% | 2.69 ms | −32% | 0.51 |
+| GLM-5.3-Flash FP8 4×H200, B=1 | 163 tok/s (6.14 ms) | 0.94 ms | −85% | 1.25 ms | −80% | 0.15 |
+| vLLM Llama-3.1-8B H100, concurrency 8 (serial-wave) | 585 s | 371 s | −37% | 501 s | −14% | — |
+
+Decode-only MAPE: **46.6% (spec)** → **28.8% (realistic)**. The two H100
+single-stream rows land within ~3% of the realistic prediction; the remaining
+residuals decompose into per-step software overhead, MoE routing/communication
+latency, backend maturity (B200/FlashInfer at 51% implied bandwidth), and
+scheduler behavior (MLPerf offline/server rows are listed as references, not
+compared, because their concurrency is unpublished).
+
+Reproduce from the repo root:
+
+```sh
+make -C cpp            # build the native core
+python3 -m simulator.validate --print
 ```
 
 ---

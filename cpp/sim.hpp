@@ -13,6 +13,12 @@ typedef struct {
   int hidden;
   int heads;
   int kv_heads;
+  /* MoE routing (0 means "dense / not modeled"). experts = routed experts,
+     topk = experts active per token. These refine decode DRAM traffic:
+     a decode step streams only the union of experts the batch touches,
+     not the full weight set. */
+  int experts;
+  int topk;
 } GothamModel;
 
 /* GPU compute/memory characteristics. fp8_tflops = 0 means "not supported". */
@@ -60,6 +66,8 @@ typedef struct {
   GothamPhase prefill;
   GothamPhase decode;
   double w_bytes;
+  double decode_w_bytes;   /* weight bytes streamed per decode step at B */
+  double decode_streamed_b; /* params streamed per decode step (B units) */
   double kv_write_per_token;
   double kv_read_per_token;
   double act_per_token;

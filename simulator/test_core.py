@@ -36,7 +36,7 @@ def main():
 
     # LLaMA-3 8B prefill: compute-bound at peak, ~57.7k tok/s
     s = core.simulate(m8b, gpu, cfg)
-    approx(s["prefill"]["intensity"], 2032, 0.02, "prefill intensity")
+    approx(s["prefill"]["intensity"], 2081, 0.02, "prefill intensity")
     approx(s["prefill"]["achieved"], 989.5e12, 0.01, "prefill achieved")
     assert s["prefill"]["bound"] == "compute", "prefill should be compute-bound"
     approx(s["prefill"]["throughput"], 57752, 0.05, "prefill tok/s")
@@ -44,7 +44,7 @@ def main():
     # LLaMA-3 8B decode at B=1: memory-bound, ~196 tok/s
     approx(s["decode"]["intensity"], 1.0, 0.03, "decode intensity")
     assert s["decode"]["bound"] == "memory", "decode should be memory-bound"
-    approx(s["decode"]["achieved"], 3350e9, 0.02, "decode achieved")
+    approx(s["decode"]["achieved"], 3433e9, 0.02, "decode achieved")
     approx(s["decode"]["throughput"], 196, 0.06, "decode tok/s")
 
     # 70B does not fit one H100; fits two
@@ -58,6 +58,14 @@ def main():
     sm = core.simulate(mixtral, gpu, cfg)
     assert sm["decode"]["bound"] == "memory"
     approx(sm["wBytes"], 46.7e9 * 2, 0.01, "mixtral weights")
+    # MoE decode streams the per-token active weight set, not all 46.7B
+    approx(sm["decodeWBytes"], 12.9e9 * 2, 0.03, "mixtral decode stream weights")
+    approx(sm["decode"]["intensity"], 1.0, 0.06, "mixtral decode intensity")
+    approx(sm["decode"]["throughput"], 3350e9 / (12.9e9 * 2), 0.06, "mixtral decode tok/s")
+
+    # Dense models still stream the full weight set per decode step
+    s8 = core.simulate(m8b, gpu, cfg)
+    approx(s8["decodeWBytes"], s8["wBytes"], 1e-9, "dense decode stream weights")
 
     # Sweep: 44 points, monotonic intensity, first ~1 FLOP/B
     pts = core.decode_sweep(m8b, gpu, cfg)

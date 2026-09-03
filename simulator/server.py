@@ -89,6 +89,8 @@ def _simulate_payload(payload):
             "model": m,
             "prefill": sim["prefill"],
             "decode": sim["decode"],
+            "decodeWBytes": sim["decodeWBytes"],
+            "decodeStreamedB": sim["decodeStreamedB"],
             "memory_per_gpu": {
                 "weights": mem["weights"] / gpus,
                 "kv": mem["kv"] / gpus,
@@ -108,6 +110,8 @@ def _simulate_payload(payload):
         "peak": sim0["peak"],
         "bw": sim0["bw"],
         "ridge": sim0["ridge"],
+        "decodeWBytes": sim0["decodeWBytes"],
+        "decodeStreamedB": sim0["decodeStreamedB"],
         "coreVersion": core.version(),
         "ceilings": _build_ceilings(gpu, cfg, compute_scale),
         "results": results,

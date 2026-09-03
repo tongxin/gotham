@@ -39,6 +39,40 @@ double active_params(const GothamModel* m) {
   return b * 1e9;
 }
 
+/* Weight bytes streamed per decode step.
+
+   Dense models read the whole weight set once per step, independent of batch.
+   MoE models with expert-parallel weight placement only need the experts that
+   the current batch actually routes to. For a batch of B tokens over E routed
+   experts with top-k routing, the expected number of distinct experts touched
+   is E * (1 - (1 - k/E)^B): B=1 streams ~k/E of the routed weights (i.e. the
+   per-token active expert set), and a full batch eventually touches every
+   expert, recovering the dense weight-streaming cost.
+
+   The shared (always-active) weight share is not published in model cards, so
+   it is estimated from the catalog's total and active parameter counts:
+   active ≈ shared + (k/E) * (total - shared). shared_b comes back in the same
+   "B" parameter units as params_b. */
+double decode_weight_bytes(const GothamModel* m, double bytes_per_param,
+                           int B, double* shared_b) {
+  const int E = m->experts;
+  const double total = m->params_b;
+  double shared = total;
+  if (E > 1 && m->active_b > 0 && m->active_b < total) {
+    const double k = std::max(1, std::min(m->topk > 0 ? m->topk : 1, E));
+    const double kfrac = k / static_cast<double>(E);
+    const double est =
+        (m->active_b - kfrac * total) / (1.0 - kfrac);
+    shared = std::max(0.0, std::min(total, est));
+    const double exp_w = total - shared;
+    const int b = B > 0 ? B : 1;
+    const double fill = 1.0 - std::pow(1.0 - kfrac, static_cast<double>(b));
+    shared += exp_w * fill;
+  }
+  if (shared_b) *shared_b = shared;
+  return shared * 1e9 * bytes_per_param;
+}
+
 double flops_per_token(const GothamModel* m) {
   return 2.0 * active_params(m);
 }
@@ -87,6 +121,8 @@ int gotham_simulate(const GothamModel* m, const GothamGpu* g,
   out->peak = gotham_peak_flops(g, cfg->precision, compute_scale);
   out->bw = g->bandwidth_gbps * 1e9 * bw_scale;
   out->ridge = out->peak / out->bw;
+  const double wpp = bytes_per_elem(cfg->precision) * quant_overhead(cfg->precision);
+  out->decode_w_bytes = decode_weight_bytes(m, wpp, B, &out->decode_streamed_b);
 
   const auto run_phase = [&](GothamPhase* ph, double flops, double bytes,
                              double tokens) {
@@ -118,8 +154,9 @@ int gotham_simulate(const GothamModel* m, const GothamGpu* g,
   if (cfg->phase == 1 || cfg->phase == 2) {
     const double tokens = B;
     const double flops = B * (flops_per_token(m) + attention_decode(m, S));
-    const double bytes = out->w_bytes + B * (out->kv_read_per_token +
-                                             out->kv_write_per_token + out->act_per_token);
+    const double bytes = out->decode_w_bytes + B * (out->kv_read_per_token +
+                                                    out->kv_write_per_token +
+                                                    out->act_per_token);
     run_phase(&out->decode, flops, bytes, tokens);
   }
 

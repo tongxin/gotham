@@ -1,0 +1,556 @@
+{
+  "generated": "2026-09-03T11:48:11.337020+00:00",
+  "coreVersion": "gotham-core-0.1.0",
+  "realistic": {
+    "id": "realistic",
+    "label": "Realistic operating point",
+    "computeEfficiency": 0.7,
+    "bandwidthEfficiency": 0.75,
+    "note": "Achieved tensor-core and HBM fractions are never 100% of the spec sheet. Defaults are calibrated from the L1 validation set (vLLM / TensorRT-LLM / MLPerf records in simulator/validation_data.py): decode kernels on Hopper typically sustain 60-85% of HBM spec, and prefill GEMMs typically sustain 55-75% of the FP8/FP16 tensor peak. Both are user-adjustable in the UI; the Spec-peak mode keeps the classic upper-bound analysis."
+  },
+  "errorDefinition": "signed error = (predicted - measured) / measured; positive = simulator over-predicts the metric",
+  "aggregate": {
+    "modes": {
+      "spec": {
+        "rows": 4,
+        "mapePct": 46.63592561858663,
+        "signedMeanPct": -46.63592561858663,
+        "maxAbsPct": 84.70867785927737
+      },
+      "realistic": {
+        "rows": 4,
+        "mapePct": 28.847900824782172,
+        "signedMeanPct": -28.847900824782172,
+        "maxAbsPct": 79.61157047903649
+      }
+    },
+    "compositeSerial": [
+      {
+        "id": "vllm-fp8kv-llama31-8b-h100-c8-fp8kv",
+        "measured": 585.2,
+        "spec": {
+          "signedErrorPct": -36.670743747609265,
+          "predicted": 370.60280758899063
+        },
+        "realistic": {
+          "signedErrorPct": -14.430326856787357,
+          "predicted": 500.75372723408043
+        }
+      }
+    ],
+    "reference": [
+      {
+        "id": "redhat-mlperf-v51-llama31-8b-h100-offline",
+        "measured": 5777.08
+      },
+      {
+        "id": "redhat-mlperf-v51-llama31-8b-h100-server",
+        "measured": 5103.99
+      },
+      {
+        "id": "redhat-mlperf-v51-llama31-8b-l40s-offline",
+        "measured": 1642.0
+      },
+      {
+        "id": "redhat-mlperf-v51-llama31-8b-l40s-server",
+        "measured": 1207.0
+      },
+      {
+        "id": "nvidia-trtllm-llama2-70b-8xh100-single",
+        "measured": 0.75
+      }
+    ]
+  },
+  "rows": [
+    {
+      "id": "vllm-fp8kv-llama31-8b-h100-bf16kv",
+      "source": "vLLM FP8 KV-cache validation (official vLLM project blog)",
+      "url": "https://github.com/vllm-project/vllm-project.github.io/blob/main/_posts/2026-04-22-fp8-kvcache.md",
+      "published": "2026-04-22",
+      "accessed": "2026-09-03",
+      "model": "llama3-8b",
+      "gpu": "h100",
+      "precision": "fp16",
+      "kvPrecision": "fp16",
+      "phase": "decode",
+      "B": 1,
+      "S": 778,
+      "gpus": 1,
+      "engine": "vLLM",
+      "engineVersion": "v0.19.1 + FlashAttention-3",
+      "metric": "interTokenLatencyMs",
+      "measured": 6.474,
+      "measuredThroughputTokPerSec": 154.5,
+      "measuredOutputTokPerSec": null,
+      "notes": "Single-request (concurrency 1) decode on one H100; 128 output tokens, input length swept 256-125k. ITL is the fitted line evaluated at S=778 (MLPerf CNN-DailyMail average input length): 6.44 + 4.37e-5*778 ms. Model weights are BF16; KV cache is BF16.",
+      "comparable": "decode",
+      "impliedBandwidthEfficiency": 0.7452160247880153,
+      "modes": {
+        "spec": {
+          "predicted": 4.824528544477611,
+          "signedErrorPct": -25.478397521198463,
+          "absErrorPct": 25.478397521198463,
+          "bound": "memory",
+          "cfg": {
+            "phase": "decode",
+            "B": 1,
+            "S": 778,
+            "gpus": 1,
+            "precision": "fp16",
+            "kvPrecision": "fp16",
+            "computeScale": 1.0,
+            "bandwidthScale": 1.0
+          },
+          "stepTimeMs": 4.824528544477611,
+          "interTokenLatencyMs": 4.824528544477611,
+          "throughputTokPerSec": 207.27413897149563,
+          "bytesPerStep": 16162170623.999998,
+          "wBytes": 16059999999.999998,
+          "decodeWBytes": 16059999999.999998,
+          "decodeStreamedB": 8.03,
+          "utilization": 0.003417548370684066
+        },
+        "realistic": {
+          "predicted": 6.432704725970148,
+          "signedErrorPct": -0.6378633615979611,
+          "absErrorPct": 0.6378633615979611,
+          "bound": "memory",
+          "cfg": {
+            "phase": "decode",
+            "B": 1,
+            "S": 778,
+            "gpus": 1,
+            "precision": "fp16",
+            "kvPrecision": "fp16",
+            "computeScale": 0.7,
+            "bandwidthScale": 0.75
+          },
+          "stepTimeMs": 6.432704725970148,
+          "interTokenLatencyMs": 6.432704725970148,
+          "throughputTokPerSec": 155.45560422862172,
+          "bytesPerStep": 16162170623.999998,
+          "wBytes": 16059999999.999998,
+          "decodeWBytes": 16059999999.999998,
+          "decodeStreamedB": 8.03,
+          "utilization": 0.003661658968590071
+        }
+      }
+    },
+    {
+      "id": "vllm-fp8kv-llama31-8b-h100-fp8kv",
+      "source": "vLLM FP8 KV-cache validation (official vLLM project blog)",
+      "url": "https://github.com/vllm-project/vllm-project.github.io/blob/main/_posts/2026-04-22-fp8-kvcache.md",
+      "published": "2026-04-22",
+      "accessed": "2026-09-03",
+      "model": "llama3-8b",
+      "gpu": "h100",
+      "precision": "fp16",
+      "kvPrecision": "fp8",
+      "phase": "decode",
+      "B": 1,
+      "S": 778,
+      "gpus": 1,
+      "engine": "vLLM",
+      "engineVersion": "v0.19.1 + FlashAttention-3",
+      "metric": "interTokenLatencyMs",
+      "measured": 6.598,
+      "measuredThroughputTokPerSec": 151.6,
+      "measuredOutputTokPerSec": null,
+      "notes": "Same sweep as the BF16-KV row with --kv-cache-dtype fp8. The measured ITL slope (2.37e-5 ms/token) is almost exactly the FP8 KV read traffic the L1 model predicts, validating the KV-read term; the intercept (6.58 ms) is dominated by software overheads at concurrency 1.",
+      "comparable": "decode",
+      "impliedBandwidthEfficiency": 0.72890102744839,
+      "modes": {
+        "spec": {
+          "predicted": 4.809288979104477,
+          "signedErrorPct": -27.109897255161002,
+          "absErrorPct": 27.109897255161002,
+          "bound": "memory",
+          "cfg": {
+            "phase": "decode",
+            "B": 1,
+            "S": 778,
+            "gpus": 1,
+            "precision": "fp16",
+            "kvPrecision": "fp8",
+            "computeScale": 1.0,
+            "bandwidthScale": 1.0
+          },
+          "stepTimeMs": 4.809288979104477,
+          "interTokenLatencyMs": 4.809288979104477,
+          "throughputTokPerSec": 207.93094454187008,
+          "bytesPerStep": 16111118079.999998,
+          "wBytes": 16059999999.999998,
+          "decodeWBytes": 16059999999.999998,
+          "decodeStreamedB": 8.03,
+          "utilization": 0.003428377820117688
+        },
+        "realistic": {
+          "predicted": 6.412385305472636,
+          "signedErrorPct": -2.813196340214668,
+          "absErrorPct": 2.813196340214668,
+          "bound": "memory",
+          "cfg": {
+            "phase": "decode",
+            "B": 1,
+            "S": 778,
+            "gpus": 1,
+            "precision": "fp16",
+            "kvPrecision": "fp8",
+            "computeScale": 0.7,
+            "bandwidthScale": 0.75
+          },
+          "stepTimeMs": 6.412385305472636,
+          "interTokenLatencyMs": 6.412385305472636,
+          "throughputTokPerSec": 155.94820840640256,
+          "bytesPerStep": 16111118079.999998,
+          "wBytes": 16059999999.999998,
+          "decodeWBytes": 16059999999.999998,
+          "decodeStreamedB": 8.03,
+          "utilization": 0.0036732619501260947
+        }
+      }
+    },
+    {
+      "id": "vllm-fp8kv-llama31-8b-b200-fp8kv",
+      "source": "vLLM FP8 KV-cache validation (official vLLM project blog)",
+      "url": "https://github.com/vllm-project/vllm-project.github.io/blob/main/_posts/2026-04-22-fp8-kvcache.md",
+      "published": "2026-04-22",
+      "accessed": "2026-09-03",
+      "model": "llama3-8b",
+      "gpu": "b200",
+      "precision": "fp16",
+      "kvPrecision": "fp8",
+      "phase": "decode",
+      "B": 1,
+      "S": 778,
+      "gpus": 1,
+      "engine": "vLLM",
+      "engineVersion": "vLLM + FlashInfer (same post)",
+      "metric": "interTokenLatencyMs",
+      "measured": 3.968,
+      "measuredThroughputTokPerSec": 252.0,
+      "measuredOutputTokPerSec": null,
+      "notes": "Single-request decode on one B200 with the FlashInfer backend; ITL fit evaluated at S=778. The intercept is well above the pure weight-streaming bound, so the implied bandwidth efficiency is lower than on H100 for this measurement.",
+      "comparable": "decode",
+      "impliedBandwidthEfficiency": 0.5075327016129031,
+      "modes": {
+        "spec": {
+          "predicted": 2.0138897599999996,
+          "signedErrorPct": -49.24672983870968,
+          "absErrorPct": 49.24672983870968,
+          "bound": "memory",
+          "cfg": {
+            "phase": "decode",
+            "B": 1,
+            "S": 778,
+            "gpus": 1,
+            "precision": "fp16",
+            "kvPrecision": "fp8",
+            "computeScale": 1.0,
+            "bandwidthScale": 1.0
+          },
+          "stepTimeMs": 2.0138897599999996,
+          "interTokenLatencyMs": 2.0138897599999996,
+          "throughputTokPerSec": 496.5515093537196,
+          "bytesPerStep": 16111118079.999998,
+          "wBytes": 16059999999.999998,
+          "decodeWBytes": 16059999999.999998,
+          "decodeStreamedB": 8.03,
+          "utilization": 0.0036005358307199496
+        },
+        "realistic": {
+          "predicted": 2.6851863466666663,
+          "signedErrorPct": -32.32897311827958,
+          "absErrorPct": 32.32897311827958,
+          "bound": "memory",
+          "cfg": {
+            "phase": "decode",
+            "B": 1,
+            "S": 778,
+            "gpus": 1,
+            "precision": "fp16",
+            "kvPrecision": "fp8",
+            "computeScale": 0.7,
+            "bandwidthScale": 0.75
+          },
+          "stepTimeMs": 2.6851863466666663,
+          "interTokenLatencyMs": 2.6851863466666663,
+          "throughputTokPerSec": 372.4136320152897,
+          "bytesPerStep": 16111118079.999998,
+          "wBytes": 16059999999.999998,
+          "decodeWBytes": 16059999999.999998,
+          "decodeStreamedB": 8.03,
+          "utilization": 0.0038577169614856604
+        }
+      }
+    },
+    {
+      "id": "glm53-flash-fp8-h200-tp4-single-stream",
+      "source": "GLM-5.3-Flash FP8 model card (dealignai), cross-checked with SGLang docs and zai-org config.json",
+      "url": "https://huggingface.co/dealignai/GLM-5.3-Flash-UNCENSORED-FP8",
+      "published": "2026-08-28",
+      "accessed": "2026-09-03",
+      "model": "glm-5.3-flash",
+      "gpu": "h200",
+      "precision": "fp8",
+      "kvPrecision": "fp16",
+      "phase": "decode",
+      "B": 1,
+      "S": 128,
+      "gpus": 4,
+      "engine": "vLLM",
+      "engineVersion": "vLLM (TP4)",
+      "metric": "interTokenLatencyMs",
+      "measured": 6.135,
+      "measuredThroughputTokPerSec": 163.0,
+      "measuredOutputTokPerSec": null,
+      "notes": "Single-stream decode of GLM-5.3-Flash FP8 on 4x H200 (TP4). Model card reports 163 tok/s decode without MTP speculative decoding (211 tok/s with MTP). S is unpublished; S=128 is assumed for the tiny KV term. Architecture from config.json: 320B total / 18B active, 45 text layers, 288 experts, top-8.",
+      "comparable": "decode",
+      "impliedBandwidthEfficiency": 0.15291322140722632,
+      "modes": {
+        "spec": {
+          "predicted": 0.9381226133333336,
+          "signedErrorPct": -84.70867785927737,
+          "absErrorPct": 84.70867785927737,
+          "bound": "memory",
+          "cfg": {
+            "phase": "decode",
+            "B": 1,
+            "S": 128,
+            "gpus": 4,
+            "precision": "fp8",
+            "kvPrecision": "fp16",
+            "computeScale": 1.0,
+            "bandwidthScale": 1.0
+          },
+          "stepTimeMs": 0.9381226133333336,
+          "interTokenLatencyMs": 0.9381226133333336,
+          "throughputTokPerSec": 1065.9587411999419,
+          "bytesPerStep": 18011954176.000004,
+          "wBytes": 320000000000.0,
+          "decodeWBytes": 18000000000.000004,
+          "decodeStreamedB": 18.000000000000004,
+          "utilization": 0.004854863593679783
+        },
+        "realistic": {
+          "predicted": 1.2508301511111113,
+          "signedErrorPct": -79.61157047903649,
+          "absErrorPct": 79.61157047903649,
+          "bound": "memory",
+          "cfg": {
+            "phase": "decode",
+            "B": 1,
+            "S": 128,
+            "gpus": 4,
+            "precision": "fp8",
+            "kvPrecision": "fp16",
+            "computeScale": 0.7,
+            "bandwidthScale": 0.75
+          },
+          "stepTimeMs": 1.2508301511111113,
+          "interTokenLatencyMs": 1.2508301511111113,
+          "throughputTokPerSec": 799.4690558999564,
+          "bytesPerStep": 18011954176.000004,
+          "wBytes": 320000000000.0,
+          "decodeWBytes": 18000000000.000004,
+          "decodeStreamedB": 18.000000000000004,
+          "utilization": 0.005201639564656911
+        }
+      }
+    },
+    {
+      "id": "vllm-fp8kv-llama31-8b-h100-c8-fp8kv",
+      "source": "vLLM FP8 KV-cache validation (official vLLM project blog)",
+      "url": "https://github.com/vllm-project/vllm-project.github.io/blob/main/_posts/2026-04-22-fp8-kvcache.md",
+      "published": "2026-04-22",
+      "accessed": "2026-09-03",
+      "model": "llama3-8b",
+      "gpu": "h100",
+      "precision": "fp16",
+      "kvPrecision": "fp8",
+      "phase": "composite",
+      "B": 8,
+      "S": 20000,
+      "gpus": 1,
+      "engine": "vLLM",
+      "engineVersion": "v0.19.1 + FlashAttention-3",
+      "metric": "totalDurationS",
+      "measured": 585.2,
+      "measuredThroughputTokPerSec": null,
+      "measuredOutputTokPerSec": 517.5,
+      "notes": "150 requests, ~20k input / ~2k output tokens each, concurrency 8 on one H100, FP8 KV cache, BF16 weights. L1 replay treats the run as ceil(150/8)=19 serial waves of one prefill (B=8) followed by 2000 decode steps (B=8) - a documented approximation that ignores prefill/decode overlap and scheduler gaps.",
+      "comparable": "composite_serial",
+      "impliedBandwidthEfficiency": null,
+      "modes": {
+        "spec": {
+          "predicted": 370.60280758899063,
+          "signedErrorPct": -36.670743747609265,
+          "absErrorPct": 36.670743747609265,
+          "bound": "memory",
+          "waves": 19,
+          "totalDurationS": 370.60280758899063,
+          "throughputTokPerSec": 8904.411764898978,
+          "outputTokPerSec": 809.4919786271797,
+          "prefillTimeS": 3.656569984840828,
+          "decodeStepMs": 7.92442047044776,
+          "prefillBound": "compute",
+          "decodeBound": "memory"
+        },
+        "realistic": {
+          "predicted": 500.75372723408043,
+          "signedErrorPct": -14.430326856787357,
+          "absErrorPct": 14.430326856787357,
+          "bound": "memory",
+          "waves": 19,
+          "totalDurationS": 500.75372723408043,
+          "throughputTokPerSec": 6590.065775900644,
+          "outputTokPerSec": 599.0968887182404,
+          "prefillTimeS": 5.223671406915469,
+          "decodeStepMs": 10.565893960597014,
+          "prefillBound": "compute",
+          "decodeBound": "memory"
+        }
+      }
+    },
+    {
+      "id": "redhat-mlperf-v51-llama31-8b-h100-offline",
+      "source": "Red Hat: MLPerf Inference v5.1 results",
+      "url": "https://www.redhat.com/en/blog/efficient-and-reproducible-llm-inference-red-hat-mlperf-inference-v51-results",
+      "published": "2025-10-31",
+      "accessed": "2026-09-03",
+      "model": "llama3-8b",
+      "gpu": "h100",
+      "precision": "fp8",
+      "kvPrecision": "fp8",
+      "phase": "composite",
+      "B": null,
+      "S": 778,
+      "gpus": 1,
+      "engine": "vLLM",
+      "engineVersion": "v0.10.0 (MLPerf Offline scenario)",
+      "metric": "throughputTokPerSec",
+      "measured": 5777.08,
+      "measuredThroughputTokPerSec": null,
+      "measuredOutputTokPerSec": null,
+      "notes": "Official MLPerf v5.1 small-LLM result: FP8 Llama-3.1-8B on one H100, CNN-DailyMail subset (avg ISL 778 / OSL 73). Offline throughput is achieved at an unpublished, scheduler-controlled concurrency, so no L1 prediction is computed; listed as a reference point for the scheduler-level L2/L3 stages.",
+      "comparable": "reference",
+      "impliedBandwidthEfficiency": null,
+      "modes": {
+        "spec": null,
+        "realistic": null
+      }
+    },
+    {
+      "id": "redhat-mlperf-v51-llama31-8b-h100-server",
+      "source": "Red Hat: MLPerf Inference v5.1 results",
+      "url": "https://www.redhat.com/en/blog/efficient-and-reproducible-llm-inference-red-hat-mlperf-inference-v51-results",
+      "published": "2025-10-31",
+      "accessed": "2026-09-03",
+      "model": "llama3-8b",
+      "gpu": "h100",
+      "precision": "fp8",
+      "kvPrecision": "fp8",
+      "phase": "composite",
+      "B": null,
+      "S": 778,
+      "gpus": 1,
+      "engine": "vLLM",
+      "engineVersion": "v0.10.0 (MLPerf Server scenario)",
+      "metric": "throughputTokPerSec",
+      "measured": 5103.99,
+      "measuredThroughputTokPerSec": null,
+      "measuredOutputTokPerSec": null,
+      "notes": "Same submission, Server scenario (Poisson load, TTFT/TPOT bounds). Concurrency is load-dependent; reference only at L1.",
+      "comparable": "reference",
+      "impliedBandwidthEfficiency": null,
+      "modes": {
+        "spec": null,
+        "realistic": null
+      }
+    },
+    {
+      "id": "redhat-mlperf-v51-llama31-8b-l40s-offline",
+      "source": "Red Hat: MLPerf Inference v5.1 results",
+      "url": "https://www.redhat.com/en/blog/efficient-and-reproducible-llm-inference-red-hat-mlperf-inference-v51-results",
+      "published": "2025-10-31",
+      "accessed": "2026-09-03",
+      "model": "llama3-8b",
+      "gpu": "l40s",
+      "precision": "fp8",
+      "kvPrecision": "fp8",
+      "phase": "composite",
+      "B": null,
+      "S": 778,
+      "gpus": 1,
+      "engine": "vLLM",
+      "engineVersion": "v0.10.0 (MLPerf Offline scenario)",
+      "metric": "throughputTokPerSec",
+      "measured": 1642.0,
+      "measuredThroughputTokPerSec": null,
+      "measuredOutputTokPerSec": null,
+      "notes": "L40S Offline; reference only at L1 (concurrency unpublished).",
+      "comparable": "reference",
+      "impliedBandwidthEfficiency": null,
+      "modes": {
+        "spec": null,
+        "realistic": null
+      }
+    },
+    {
+      "id": "redhat-mlperf-v51-llama31-8b-l40s-server",
+      "source": "Red Hat: MLPerf Inference v5.1 results",
+      "url": "https://www.redhat.com/en/blog/efficient-and-reproducible-llm-inference-red-hat-mlperf-inference-v51-results",
+      "published": "2025-10-31",
+      "accessed": "2026-09-03",
+      "model": "llama3-8b",
+      "gpu": "l40s",
+      "precision": "fp8",
+      "kvPrecision": "fp8",
+      "phase": "composite",
+      "B": null,
+      "S": 778,
+      "gpus": 1,
+      "engine": "vLLM",
+      "engineVersion": "v0.10.0 (MLPerf Server scenario)",
+      "metric": "throughputTokPerSec",
+      "measured": 1207.0,
+      "measuredThroughputTokPerSec": null,
+      "measuredOutputTokPerSec": null,
+      "notes": "L40S Server; reference only at L1 (concurrency unpublished).",
+      "comparable": "reference",
+      "impliedBandwidthEfficiency": null,
+      "modes": {
+        "spec": null,
+        "realistic": null
+      }
+    },
+    {
+      "id": "nvidia-trtllm-llama2-70b-8xh100-single",
+      "source": "NVIDIA TensorRT-LLM: batch-1 latency study (Dec 2023)",
+      "url": "https://developer.nvidia.com/blog/tensorrt-llm-improves-large-language-model-latency-by-up-to-8x-on-hopper-gpus/",
+      "published": "2023-12-14",
+      "accessed": "2026-09-03",
+      "model": "llama2-70b",
+      "gpu": "h100",
+      "precision": "fp8",
+      "kvPrecision": "fp8",
+      "phase": "composite",
+      "B": 1,
+      "S": 2048,
+      "gpus": 8,
+      "engine": "TensorRT-LLM",
+      "engineVersion": "TRT-LLM (TP8)",
+      "metric": "queriesPerSec",
+      "measured": 0.75,
+      "measuredThroughputTokPerSec": null,
+      "measuredOutputTokPerSec": null,
+      "notes": "Single request, ISL 2048 / OSL 128, 8x H100, ~1.7 s per inference. Batch-1 decode latency is dominated by per-step software and pipeline overheads rather than DRAM streaming, so the row is reference-only for L1 and motivates L2/L3 latency modeling.",
+      "comparable": "reference",
+      "impliedBandwidthEfficiency": null,
+      "modes": {
+        "spec": null,
+        "realistic": null
+      }
+    }
+  ]
+}

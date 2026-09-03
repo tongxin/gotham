@@ -13,8 +13,9 @@
     B: 1,
     S: 2048,
     gpus: 1,
-    computeScale: 1,
-    bandwidthScale: 1,
+    mode: 'realistic',
+    computeScale: 0.70,
+    bandwidthScale: 0.75,
     showOtherCeilings: true,
     showPrecisionCeilings: true,
     showSweep: false,
@@ -55,6 +56,40 @@
     var el = $('appStatus');
     el.textContent = msg;
     el.className = 'app-status' + (kind ? ' ' + kind : '');
+  }
+
+  function sliderPos(scale) {
+    return Math.max(-15, Math.min(10, Math.round(Math.log2(scale) * 10)));
+  }
+
+  function setScales(comp, bw, moveSliders) {
+    state.computeScale = comp;
+    state.bandwidthScale = bw;
+    $('cOut').textContent = Math.round(comp * 100) + '%';
+    $('bwOut').textContent = Math.round(bw * 100) + '%';
+    if (moveSliders) {
+      $('cSlider').value = sliderPos(comp);
+      $('bwSlider').value = sliderPos(bw);
+    }
+  }
+
+  function applyMode(mode) {
+    state.mode = mode;
+    var seg = $('modeSeg');
+    seg.querySelectorAll('button').forEach(function (b) {
+      b.classList.toggle('active', b.getAttribute('data-mode') === mode);
+    });
+    var r = (catalog && catalog.realistic) || { computeEfficiency: 0.70, bandwidthEfficiency: 0.75 };
+    if (mode === 'realistic') {
+      setScales(r.computeEfficiency, r.bandwidthEfficiency, true);
+      $('modeHint').textContent = 'Preset calibrated from validation records: compute ' +
+        Math.round(r.computeEfficiency * 100) + '% · DRAM ' +
+        Math.round(r.bandwidthEfficiency * 100) + '% of spec. Sliders override.';
+    } else {
+      setScales(1, 1, true);
+      $('modeHint').textContent = 'Classic upper-bound analysis at 100% of the spec-sheet peaks.';
+    }
+    refresh();
   }
 
   function buildGpuSelect() {
@@ -116,6 +151,11 @@
       state.phase = btn.getAttribute('data-phase');
       seg.querySelectorAll('button').forEach(function (b) { b.classList.toggle('active', b === btn); });
       refresh();
+    });
+    $('modeSeg').addEventListener('click', function (ev) {
+      var btn = ev.target.closest('button');
+      if (!btn) return;
+      applyMode(btn.getAttribute('data-mode'));
     });
 
     function bindSlider(inputId, outId, fn) {
@@ -308,17 +348,19 @@
       var memTag = perGpuGB > g.memory_GB
         ? '<span class="tag oom">' + perGpuGB.toFixed(1) + ' / ' + g.memory_GB + ' GB</span>'
         : '<span class="tag ok">' + perGpuGB.toFixed(1) + ' / ' + g.memory_GB + ' GB</span>';
-      if (r.prefill) body += tableRow(r.model.name, 'Prefill', r.prefill, memTag);
-      if (r.decode) body += tableRow(r.model.name, 'Decode', r.decode, memTag);
+      var decW = r.decodeWBytes ? r.decodeWBytes / state.gpus : 0;
+      if (r.prefill) body += tableRow(r.model.name, 'Prefill', r.prefill, memTag, null);
+      if (r.decode) body += tableRow(r.model.name, 'Decode', r.decode, memTag, decW);
     });
     $('resultsTable').innerHTML =
       '<table><thead><tr>' +
       '<th>Model</th><th>Phase</th><th>FLOPs / GPU</th><th>DRAM / GPU</th><th>Intensity</th>' +
-      '<th>Achieved</th><th>Util</th><th>Bound</th><th>Tokens/s</th><th>Time</th><th>Mem / GPU</th>' +
+      '<th>Achieved</th><th>Util</th><th>Bound</th><th>Tokens/s</th><th>Time</th>' +
+      '<th>Decode W stream / GPU</th><th>Mem / GPU</th>' +
       '</tr></thead><tbody>' + body + '</tbody></table>';
   }
 
-  function tableRow(name, phase, ph, memTag) {
+  function tableRow(name, phase, ph, memTag, decWPerGpu) {
     return '<tr>' +
       '<td class="lbl">' + name + '</td>' +
       '<td>' + phase + '</td>' +
@@ -330,6 +372,7 @@
       '<td><span class="tag ' + ph.bound + '">' + ph.bound + '</span></td>' +
       '<td>' + sig(ph.throughput, 4) + '</td>' +
       '<td>' + fmtTime(ph.time) + '</td>' +
+      '<td>' + (phase === 'Decode' && decWPerGpu ? Charts.fmtBytes(decWPerGpu) : '–') + '</td>' +
       '<td>' + memTag + '</td></tr>';
   }
 
@@ -348,6 +391,7 @@
     SimAPI.getCatalog()
       .then(function (d) {
         catalog = d;
+        if (state.mode === 'realistic') applyMode('realistic');
         buildGpuSelect();
         buildPrecisionSelects();
         buildModelList();

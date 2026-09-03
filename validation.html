@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GPU Roofline Simulator - L1 Validation</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="logo">▦</span> Roofline <span class="brand-sub">L1 Validation</span></div>
+    <div class="topbar-note">
+      <a href="index.html" class="tab-link">L1 · Roofline</a>
+      <a href="l2.html" class="tab-link">L2 · Kernels</a>
+      <span class="tab-link active">Validation</span>
+      <span id="appStatus" class="app-status">Connecting…</span>
+    </div>
+  </header>
+
+  <div class="layout layout-wide">
+    <main class="content">
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Predicted vs measured: where the L1 model stands</h2>
+          <span id="coreTag" class="tag ok">—</span>
+        </div>
+        <p class="side-note">
+          Every row replays an independently published measurement through the L1 core in two
+          operating points: <strong>spec</strong> (100% of datasheet peaks) and
+          <strong>realistic</strong> (compute
+          <span id="effCompute">70</span>% · DRAM <span id="effBandwidth">75</span>% of spec).
+          Signed error = (predicted − measured) / measured; positive means the simulator
+          over-predicts. Full records, URLs, and caveats live in
+          <code>simulator/validation_data.py</code> and the generated
+          <a href="benchmarks/validation_report.json" class="ref-link">validation report</a>.
+        </p>
+        <div class="cards" id="summaryCards"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Decode-only records (direct comparison)</h2>
+        <div id="decodeTable" class="table-wrap"><div class="empty">Running simulations…</div></div>
+      </section>
+
+      <section class="panel">
+        <h2>End-to-end run (serial-wave approximation)</h2>
+        <div id="compositeTable" class="table-wrap"><div class="empty">Running simulations…</div></div>
+      </section>
+
+      <section class="panel">
+        <h2>Reference records (not directly L1-comparable)</h2>
+        <div id="referenceTable" class="table-wrap"><div class="empty">—</div></div>
+        <p class="side-note">
+          These are engine/scheduler-level results whose concurrency or per-step overheads are not
+          published, so L1 cannot replay them uniquely. They are recorded here as ground truth for
+          the later L2/L3 stages and to quantify what the roofline ceiling does <em>not</em> cover.
+        </p>
+      </section>
+
+      <section class="panel">
+        <h2>Reading the residuals</h2>
+        <div class="math">
+          <p>Realistic mode lands within ~1–3% on the two single-request H100 Llama-3.1-8B rows
+          and within ~14% on the concurrency-8 end-to-end run, because those workloads are close to
+          the pure DRAM-streaming or prefill-GEMM regimes the L1 model describes. The remaining
+          errors decompose into:</p>
+          <ul>
+            <li><strong>Per-step software overhead</strong> (kernel dispatch, sampler, Python/API
+            round-trip) — visible as the measured ITL <em>intercept</em> in the vLLM fits;</li>
+            <li><strong>MoE routing/communication latency</strong> — GLM-5.3-Flash at batch 1
+            streams only 18B active bytes (~0.9 ms of DRAM time) but each token pays ~45 layers of
+            sequential expert all-to-all;</li>
+            <li><strong>Backend maturity</strong> — the B200/FlashInfer row implies only ~51% of
+            HBM, well under the H100 rows' ~73–75%;</li>
+            <li><strong>Scheduler behavior</strong> — MLPerf offline/server rows batch and overlap
+            prefill/decode at unpublished concurrency.</li>
+          </ul>
+          <p>Methodology and equations:
+          <a href="docs/simulation-methodology.md" class="ref-link">docs/simulation-methodology.md</a></p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="js/data_static.js"></script>
+  <script src="js/simapi.js"></script>
+  <script src="js/app_validation.js"></script>
+</body>
+</html>

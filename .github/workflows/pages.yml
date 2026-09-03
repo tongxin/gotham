@@ -38,7 +38,7 @@ jobs:
       - name: Stage static site
         run: |
           mkdir -p _site
-          cp -r index.html l2.html data.json css js wasm docs _site/
+          cp -r index.html l2.html validation.html data.json css js wasm docs benchmarks _site/
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

@@ -30,20 +30,29 @@ static void check(double actual, double expected, double tol, const char* label)
 
 int main() {
   /* LLaMA-3 8B */
-  const double model[11] = {8.03, 0.0, 32, 4096, 32, 0, 128256, 14336, 0, 0, 0};
+  const double model[11] = {8.03, 0.0, 32, 4096, 32, 8, 128256, 14336, 0, 0, 0};
   /* H100 */
   const double gpu1[5] = {989.5, 1979.0, 67.0, 3350.0, 80.0};
   const double gpu2[17] = {989.5, 1979.0, 67.0, 3350.0, 80.0,
                            132, 1.83, 228 * 1024.0, 256 * 1024.0, 256 * 1024.0,
                            50 * 1024.0 * 1024.0, 7000.0, 0.0, 128.0, 2048, 64, 32};
   const double cfg1[8] = {2, 1, 2048, 1, 1, 0, 1.0, 1.0};
-  double out[35];
+  double out[37];
   if (!gotham_wasm_simulate(model, gpu1, cfg1, out)) { std::printf("L1 failed\n"); return 1; }
-  check(out[5], 2032.08, 0.02, "prefill intensity");
+  check(out[5], 2081.39, 0.02, "prefill intensity");
   check(out[6], 989.5e12, 0.01, "prefill achieved");
-  check(out[18], 1.0, 0.05, "decode intensity");
-  check(out[22], 196.0, 0.06, "decode tok/s");
+  check(out[18], 1.025, 0.03, "decode intensity");
+  check(out[22], 205.2, 0.03, "decode tok/s");
   check(out[33], 295.37, 0.01, "ridge");
+  check(out[35], out[26], 1e-9, "dense decode weights == full weights");
+
+  /* Mixtral 8x7B: MoE decode at B=1 should stream active (~12.9B) weights,
+     not the full 46.7B set. */
+  const double moe_model[11] = {46.7, 12.9, 32, 4096, 32, 8, 32000, 14336, 8, 2, 0};
+  double out_moe[37];
+  if (!gotham_wasm_simulate(moe_model, gpu1, cfg1, out_moe)) { std::printf("L1 MoE failed\n"); return 1; }
+  check(out_moe[35] / 1e9, 25.8, 0.05, "MoE decode streamed weights (GB)");
+  check(out_moe[18], 1.0, 0.08, "MoE decode intensity ~ active model");
 
   double mem[4];
   gotham_wasm_memory(model, cfg1, mem);
@@ -53,12 +62,12 @@ int main() {
   double out2[313];
   char names[24 * 32];
   if (!gotham_wasm_l2_simulate(model, gpu2, cfg2, out2, names, 24 * 32)) { std::printf("L2 failed\n"); return 1; }
-  check(out2[295], 27751.0, 0.05, "L2 prefill tok/s");
+  check(out2[295], 31284.0, 0.05, "L2 prefill tok/s");
   check(out2[312], 1.0, 0.0, "L2 valid");
 
   const double cfg2d[17] = {1, 1, 2048, 1, 1, 0, 1.0, 1.0, 1, 1, 1, 64, 64, 0.8, 4, 512, 64};
   if (!gotham_wasm_l2_simulate(model, gpu2, cfg2d, out2, names, 24 * 32)) { std::printf("L2 decode failed\n"); return 1; }
-  check(out2[295], 194.0, 0.10, "L2 decode tok/s");
+  check(out2[295], 225.6, 0.10, "L2 decode tok/s");
   std::printf("kernels: %s | %s | %s\n", names, names + 32, names + 64);
 
   if (failures) { std::printf("%d FAILURES\n", failures); return 1; }

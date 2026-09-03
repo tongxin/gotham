@@ -12,6 +12,8 @@ class ModelSpec(ctypes.Structure):
         ("hidden", ctypes.c_int),
         ("heads", ctypes.c_int),
         ("kv_heads", ctypes.c_int),
+        ("experts", ctypes.c_int),
+        ("topk", ctypes.c_int),
     ]
 
 
@@ -61,6 +63,8 @@ class SimResult(ctypes.Structure):
         ("prefill", PhaseResult),
         ("decode", PhaseResult),
         ("w_bytes", ctypes.c_double),
+        ("decode_w_bytes", ctypes.c_double),
+        ("decode_streamed_b", ctypes.c_double),
         ("kv_write_per_token", ctypes.c_double),
         ("kv_read_per_token", ctypes.c_double),
         ("act_per_token", ctypes.c_double),
@@ -129,6 +133,8 @@ def _model_spec(model):
         hidden=int(model["hidden"]),
         heads=int(model["heads"]),
         kv_heads=int(model.get("kv_heads") or 0),
+        experts=int(model.get("experts") or 0),
+        topk=int(model.get("topk") or 0),
     )
 
 
@@ -189,6 +195,8 @@ def simulate(model, gpu, cfg):
         "prefill": _phase_dict(res.prefill),
         "decode": _phase_dict(res.decode),
         "wBytes": res.w_bytes,
+        "decodeWBytes": res.decode_w_bytes,
+        "decodeStreamedB": res.decode_streamed_b,
         "kvWritePerToken": res.kv_write_per_token,
         "kvReadPerToken": res.kv_read_per_token,
         "actPerToken": res.act_per_token,

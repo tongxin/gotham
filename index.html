@@ -12,6 +12,7 @@
     <div class="topbar-note">
       <a href="index.html" class="tab-link active">L1 · Roofline</a>
       <a href="l2.html" class="tab-link">L2 · Kernels</a>
+      <a href="validation.html" class="tab-link">Validation</a>
       <span id="appStatus" class="app-status">Connecting…</span>
     </div>
   </header>
@@ -65,11 +66,16 @@
 
       <section class="side-section">
         <h3>Advanced</h3>
-        <label class="field">Compute peak <output id="cOut">100%</output>
-          <input type="range" id="cSlider" min="-10" max="10" value="0" step="1">
+        <div class="seg seg-sm" id="modeSeg">
+          <button data-mode="realistic" class="active">Realistic</button>
+          <button data-mode="spec">Spec peak</button>
+        </div>
+        <p id="modeHint" class="side-note"></p>
+        <label class="field">Compute efficiency <output id="cOut">70%</output>
+          <input type="range" id="cSlider" min="-15" max="10" value="-5" step="1">
         </label>
-        <label class="field">Bandwidth <output id="bwOut">100%</output>
-          <input type="range" id="bwSlider" min="-10" max="10" value="0" step="1">
+        <label class="field">DRAM efficiency <output id="bwOut">75%</output>
+          <input type="range" id="bwSlider" min="-15" max="10" value="-4" step="1">
         </label>
         <label class="check"><input type="checkbox" id="showOtherCeilings" checked> Show other GPU ceilings</label>
         <label class="check"><input type="checkbox" id="showPrecisionCeilings" checked> Show all precision ceilings</label>
@@ -109,24 +115,43 @@
       <section class="panel">
         <h2>How the math works</h2>
         <div class="math">
-          <p>This is an idealized roofline analysis. It models the <em>upper bound</em> on
-          performance from two resources &mdash; tensor-core compute and HBM bandwidth &mdash;
-          and ignores communication, kernel-launch, and software overhead.</p>
+          <p>The roofline ceiling is the tensor-core peak for the selected precision
+          (<em>spec</em> mode) or the same peak derated by an efficiency factor
+          (<em>realistic</em> mode):</p>
+          <pre>P_eff = e_comp · P_spec          e_comp default 0.70 (Advanced slider)
+b_eff = e_bw · b_spec           e_bw default 0.75 (Advanced slider)
+A = min(P_eff, b_eff · I)</pre>
           <pre>FLOPs(prefill) = B·S·2·N_active + 2·B·S²·L·(H + H_kv)
 FLOPs(decode/token) = 2·N_active + 2·L·S·(H + H_kv)
 DRAM bytes(prefill) = W + B·S·(2·L·H_kv·b_kv + 16·H)
-DRAM bytes(decode/step) = W + B·(2·L·S·H_kv·b_kv + 2·L·H_kv·b_kv + 16·H)
+DRAM bytes(decode/step) = W_stream(B) + B·(2·L·S·H_kv·b_kv + 2·L·H_kv·b_kv + 16·H)
 Arithmetic intensity I = FLOPs / DRAM bytes
-Achieved = min(compute peak, bandwidth × I)
-Ridge point = compute peak / bandwidth</pre>
+Achieved = min(P_eff, b_eff × I)
+Ridge point = P_eff / b_eff</pre>
           <p>Where <code>N_active</code> is active parameters (MoE models use only their
-          per-token active experts), <code>W</code> is weight bytes, <code>H</code> hidden size,
-          <code>H_kv</code> KV-head dimension (GQA shrinks the KV cache),
+          per-token active experts), <code>W</code> is total weight bytes, <code>H</code> hidden size,
+          <code>H_kv</code> KV-head dimension (GQA/MLA shrink the KV cache),
           <code>L</code> layers, <code>S</code> sequence length, <code>B</code> batch size.
           The 16&middot;H per-token term is a rough activation-traffic estimate.
           Memory capacity includes weights, KV cache, and a FlashAttention-style activation
           buffer estimate of 16&middot;B&middot;S&middot;H bytes. Multi-GPU results assume
           ideal tensor-parallel scaling with weights and KV sharded across GPUs.</p>
+          <p><strong>MoE decode weight streaming.</strong> A dense decode step rereads all weights
+          once per step, <code>W_stream(B) = W</code>. An expert-parallel MoE only rereads the
+          union of experts the batch routes to. With <code>E</code> experts and top-<code>k</code>
+          routing, a batch of <code>B</code> tokens touches an expected
+          <code>E·(1 − (1 − k/E)^B)</code> experts, so
+          <code>W_stream(B) = W_shared + W_exp·(1 − (1 − k/E)^B)</code>, where the shared
+          (always-active) weight share is estimated from total and active parameter counts.
+          At <code>B=1</code> this streams roughly the per-token active expert set; a large batch
+          saturates back toward <code>W</code>. Total weight bytes are still used for prefill and
+          capacity checks.</p>
+          <p>The <em>realistic</em> efficiency defaults (compute 70%, DRAM 75%) are calibrated
+          against the measured benchmark records on the
+          <a href="validation.html" class="ref-link">Validation</a> page &mdash; see
+          <code>docs/simulation-methodology.md</code> for the equations, sources, and error
+          definitions. Even spec-mode analysis remains an upper bound that ignores
+          kernel-launch, communication, and scheduling overheads.</p>
           <p>The simulation itself runs in a <strong>C++ core</strong>
           (<code>cpp/sim.cpp</code>, exposed through a C ABI), wrapped by Python
           (<code>simulator/core.py</code> via ctypes) and served to this page by a local

@@ -9,11 +9,12 @@
 
 extern "C" {
 
-/* L1: model[11], gpu[5], cfg[8] -> out[35]
+/* L1: model[11], gpu[5], cfg[8] -> out[37]
    model: params_b active_b layers hidden heads kv_heads vocab ffn experts topk shared
    gpu:   fp16 fp8 fp32 bandwidth_gbps memory_gb
    cfg:   phase B S gpus precision kv_precision compute_scale bandwidth_scale
    out:   prefill[13] decode[13] w_bytes kv_write kv_read act kv_dim peak bw ridge valid
+          decode_w_bytes decode_streamed_b
    phase out[13]: flops bytes tokens flops_g bytes_g intensity achieved utilization
                   time throughput latency bound valid */
 int gotham_wasm_simulate(const double* m, const double* g, const double* c,
@@ -26,6 +27,8 @@ int gotham_wasm_simulate(const double* m, const double* g, const double* c,
   model.hidden = static_cast<int>(m[3]);
   model.heads = static_cast<int>(m[4]);
   model.kv_heads = static_cast<int>(m[5]);
+  model.experts = static_cast<int>(m[8]);
+  model.topk = static_cast<int>(m[9]);
   GothamGpu gpu;
   gpu.fp16_tflops = g[0];
   gpu.fp8_tflops = g[1];
@@ -70,6 +73,8 @@ int gotham_wasm_simulate(const double* m, const double* g, const double* c,
   out[32] = res.bw;
   out[33] = res.ridge;
   out[34] = res.valid;
+  out[35] = res.decode_w_bytes;
+  out[36] = res.decode_streamed_b;
   return 1;
 }
 
@@ -83,6 +88,8 @@ void gotham_wasm_memory(const double* m, const double* c, double* out) {
   model.hidden = static_cast<int>(m[3]);
   model.heads = static_cast<int>(m[4]);
   model.kv_heads = static_cast<int>(m[5]);
+  model.experts = static_cast<int>(m[8]);
+  model.topk = static_cast<int>(m[9]);
   GothamWorkload cfg;
   cfg.phase = 0;
   cfg.B = static_cast<int>(c[1]);

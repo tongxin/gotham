@@ -11,6 +11,9 @@ roofline — is documented in [docs/simulation-methodology.md](docs/simulation-m
 Two simulation levels are available:
 
 - **L1 (roofline)** — `index.html`, coarse `min(peak, bandwidth × I)` ceilings.
+- **L1 validation** — `validation.html`, replays measured, published benchmarks
+  through the L1 core and shows predicted-vs-measured errors in spec and
+  realistic operating points.
 - **L2 (kernel-level)** — `l2.html`, decomposes a transformer layer into its
   kernels (attention, SwiGLU/MoE, vocab logits) and clocks each against tensor
   compute (occupancy-limited), HBM (L2-reuse-adjusted), and SMEM bandwidth,
@@ -66,6 +69,13 @@ in-browser WASM core otherwise, so the same pages work in both modes.
   separate KV-cache dtype; overlay all precision ceilings for the selected GPU.
 - **Shape the workload** — batch size, sequence length, number of GPUs
   (idealized tensor-parallel sharding), and prefill / decode / both phases.
+- **Choose the operating point** — toggle between *Spec peak* (100% of the
+  datasheet, the classic upper bound) and *Realistic* (compute 70% / DRAM 75%
+  of spec by default, calibrated from the validation records; sliders override).
+- **Validate the model** — the Validation tab replays measured records (vLLM,
+  TensorRT-LLM, MLPerf/Red Hat) in both modes, reports signed errors per row,
+  MAPE aggregates, and each row's implied HBM efficiency, and links the recorded
+  `benchmarks/validation_report.json`.
 - **Explore the ridge** — the batch-size sweep shows how decode moves from the
   memory-bound regime toward the compute ceiling as the batch grows.
 - **Check capacity** — stacked memory chart shows weights, KV cache, and
@@ -85,12 +95,17 @@ simulator/core.py    ctypes binding to the C++ core
 simulator/server.py  stdlib HTTP server: static UI + /api/data + /api/simulate
 simulator/cli.py     command-line access to the same core
 simulator/test_core.py  sanity checks (python3 simulator/test_core.py)
+simulator/validation_data.py  measured benchmark records (sources + configs)
+simulator/validate.py         L1 validation replay + report writer
 js/app.js            UI state + fetch/render (no simulation math)
+js/app_validation.js Validation page UI (replays records via server or WASM)
 js/app_l2.js         L2 UI (kernel breakdown, L1-vs-L2 comparison)
 js/chart.js          SVG chart renderers (roofline, memory, throughput)
 cpp/l2.cpp           L2 kernel-level core (C ABI, additive)
 simulator/core_l2.py ctypes binding to the L2 core
 l2.html              L2 simulation page
+validation.html      L1 validation page
+benchmarks/validation_report.json  generated error report (recorded)
 ```
 
 There is deliberately **no math in JavaScript** — the browser only formats and
@@ -112,7 +127,7 @@ ridge point separates the memory-bound and compute-bound regimes.
 FLOPs(prefill)   = B·S·2·N_active + 2·B·S²·L·(H + H_kv)
 FLOPs(decode/token) = 2·N_active + 2·L·S·(H + H_kv)
 DRAM bytes(prefill) = W + B·S·(2·L·H_kv·b_kv + 16·H)
-DRAM bytes(decode/step) = W + B·(2·L·S·H_kv·b_kv + 2·L·H_kv·b_kv + 16·H)
+DRAM bytes(decode/step) = W_stream(B) + B·(2·L·S·H_kv·b_kv + 2·L·H_kv·b_kv + 16·H)
 I = FLOPs / DRAM bytes
 Achieved = min(compute peak, bandwidth × I)
 ```
@@ -124,8 +139,17 @@ estimate. Memory capacity is weights + KV cache + a FlashAttention-style
 activation estimate (`16·B·S·H`). Multi-GPU results assume ideal tensor-parallel
 scaling: weights and KV sharded evenly, communication ignored.
 
-This is an upper-bound model — it deliberately ignores kernel launches,
-communication overhead, and software efficiency. For the next step — how data,
-tensor, pipeline, and expert parallelism move bytes between chips and when
+`W_stream(B)` is the per-step weight traffic: `W` for dense models; for MoE
+models it is the union of experts the batch routes to,
+`W_stream(B) = W_shared + W_exp·(1 − (1 − k/E)^B)` with `E` experts, top-`k`,
+and the shared/expert split estimated from total and active parameter counts —
+at batch 1 that is the active expert set, at large batches it saturates to `W`.
+
+Spec mode is an upper-bound model — it ignores kernel launches, communication
+overhead, and software efficiency. The realistic preset applies sustained
+efficiency factors (`compute 70%`, `DRAM 75%` of spec by default), and the
+Validation page quantifies the remaining error against measured records (decode
+MAPE drops from ~47% at spec peaks to ~29% realistic). For the next step — how
+data, tensor, pipeline, and expert parallelism move bytes between chips and when
 communication becomes the bottleneck — see the companion interactive
 visualization: [How to Parallelize a Transformer for Training](https://ezyang.github.io/interactive-parallelize-transformer/).

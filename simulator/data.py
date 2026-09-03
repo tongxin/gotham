@@ -1,11 +1,13 @@
 """Model, GPU, and precision catalogs (single source of truth for the UI too)."""
 
+from . import validation_data
+
 MODELS = [
     {"id": "gpt2-124m", "name": "GPT-2 124M", "params": 0.124, "layers": 12, "hidden": 768, "heads": 12, "vocab": 50257, "ffn": 3072, "note": "Dense baseline"},
     {"id": "gpt2-1p5b", "name": "GPT-2 1.5B", "params": 1.542, "layers": 48, "hidden": 1600, "heads": 25, "vocab": 50257, "ffn": 6400},
     {"id": "llama2-7b", "name": "LLaMA-2 7B", "params": 6.7, "layers": 32, "hidden": 4096, "heads": 32, "vocab": 32000, "ffn": 11008},
     {"id": "mistral-7b", "name": "Mistral 7B", "params": 7.3, "layers": 32, "hidden": 4096, "heads": 32, "kv_heads": 8, "vocab": 32000, "ffn": 14336, "note": "GQA"},
-    {"id": "llama3-8b", "name": "LLaMA-3 8B", "params": 8.03, "layers": 32, "hidden": 4096, "heads": 32, "vocab": 128256, "ffn": 14336},
+    {"id": "llama3-8b", "name": "LLaMA-3 8B", "params": 8.03, "layers": 32, "hidden": 4096, "heads": 32, "kv_heads": 8, "vocab": 128256, "ffn": 14336, "note": "GQA"},
     {"id": "gemma-2b", "name": "Gemma 2B", "params": 2.6, "layers": 26, "hidden": 2304, "heads": 8, "kv_heads": 1, "vocab": 256128, "ffn": 9216, "note": "MQA"},
     {"id": "phi3-mini", "name": "Phi-3 mini 3.8B", "params": 3.8, "layers": 32, "hidden": 3072, "heads": 32, "vocab": 32064, "ffn": 8192},
     {"id": "qwen2p5-14b", "name": "Qwen2.5 14B", "params": 14.8, "layers": 48, "hidden": 5120, "heads": 40, "kv_heads": 8, "vocab": 151936, "ffn": 13824},
@@ -16,6 +18,7 @@ MODELS = [
     {"id": "deepseek-v3", "name": "DeepSeek-V3 671B", "params": 671, "active": 37, "layers": 61, "hidden": 7168, "heads": 128, "vocab": 129280, "ffn": 2048, "experts": 256, "topk": 8, "shared": 1, "moe": True, "note": "MLA, 256 experts, top-8"},
     {"id": "glm-5.2", "name": "GLM-5.2 743B", "params": 743, "active": 39, "layers": 78, "hidden": 6144, "heads": 64, "kv_heads": 8, "vocab": 151936, "ffn": 2048, "experts": 256, "topk": 8, "shared": 1, "moe": True, "note": "DSA, 256 experts, 1M ctx"},
     {"id": "glm-5.3", "name": "GLM-5.3 744B", "params": 744, "active": 40, "layers": 78, "hidden": 6144, "heads": 64, "kv_heads": 8, "vocab": 151936, "ffn": 2048, "experts": 256, "topk": 8, "shared": 1, "moe": True, "note": "Same base as 5.2, ~40B active"},
+    {"id": "glm-5.3-flash", "name": "GLM-5.3-Flash 320B", "params": 320, "active": 18, "layers": 45, "hidden": 4096, "heads": 64, "kv_heads": 8, "vocab": 154880, "ffn": 2048, "experts": 288, "topk": 8, "shared": 1, "moe": True, "note": "Hybrid MLA+DSA+KDA, 288 experts top-8, 1M ctx, MTP"},
     {"id": "deepseek-v4-flash", "name": "DeepSeek-V4 Flash", "params": 284, "active": 13, "layers": 43, "hidden": 4096, "heads": 64, "kv_heads": 1, "vocab": 129280, "ffn": 2048, "experts": 256, "topk": 6, "shared": 1, "moe": True, "note": "DSA, 256 experts, top-6, 1M ctx"},
     {"id": "deepseek-v4-pro", "name": "DeepSeek-V4 Pro", "params": 1600, "active": 49, "layers": 61, "hidden": 7168, "heads": 128, "kv_heads": 1, "vocab": 129280, "ffn": 2048, "experts": 384, "topk": 6, "shared": 1, "moe": True, "note": "DSA, 384 experts, top-6, 1M ctx"},
     {"id": "qwen3-30b-a3b", "name": "Qwen3 30B-A3B", "params": 30.5, "active": 3, "layers": 48, "hidden": 2048, "heads": 32, "kv_heads": 8, "vocab": 151936, "ffn": 6144, "experts": 64, "topk": 8, "moe": True, "note": "64 experts, top-8"},
@@ -59,6 +62,21 @@ KV_PRECISIONS = [
     {"id": "fp8", "label": "FP8 (1 B/elem)"},
 ]
 
+REALISTIC = {
+    "id": "realistic",
+    "label": "Realistic operating point",
+    "computeEfficiency": 0.70,
+    "bandwidthEfficiency": 0.75,
+    "note": (
+        "Achieved tensor-core and HBM fractions are never 100% of the spec sheet. "
+        "Defaults are calibrated from the L1 validation set (vLLM / TensorRT-LLM / "
+        "MLPerf records in simulator/validation_data.py): decode kernels on Hopper "
+        "typically sustain 60-85% of HBM spec, and prefill GEMMs typically sustain "
+        "55-75% of the FP8/FP16 tensor peak. Both are user-adjustable in the UI; "
+        "the Spec-peak mode keeps the classic upper-bound analysis."
+    ),
+}
+
 
 def get_model(model_id):
     for m in MODELS:
@@ -75,4 +93,11 @@ def get_gpu(gpu_id):
 
 
 def catalog():
-    return {"models": MODELS, "gpus": GPUS, "precisions": PRECISIONS, "kvPrecisions": KV_PRECISIONS}
+    return {
+        "models": MODELS,
+        "gpus": GPUS,
+        "precisions": PRECISIONS,
+        "kvPrecisions": KV_PRECISIONS,
+        "realistic": REALISTIC,
+        "validationBenchmarks": validation_data.BENCHMARKS,
+    }

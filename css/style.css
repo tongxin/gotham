@@ -50,6 +50,10 @@ body {
   max-width: 1680px;
   margin: 0 auto;
 }
+.layout-wide { grid-template-columns: minmax(0, 1fr); }
+.sub { color: var(--muted); font-size: 11px; line-height: 1.35; margin-top: 2px; max-width: 420px; }
+.ref-link { color: var(--accent); text-decoration: none; }
+.ref-link:hover { text-decoration: underline; }
 
 .sidebar { display: flex; flex-direction: column; gap: 12px; }
 
@@ -132,6 +136,7 @@ button.mini:hover { color: var(--text); border-color: var(--accent); }
 .field input[type="range"] { width: 100%; accent-color: var(--accent); }
 
 .seg { display: flex; background: var(--panel-2); border-radius: 8px; padding: 3px; gap: 3px; }
+.seg-sm { margin-bottom: 10px; }
 .seg button {
   flex: 1;
   background: transparent;
@@ -203,6 +208,10 @@ td.lbl { color: var(--text); font-weight: 600; }
 .tag.compute { background: rgba(158, 206, 106, .14); color: var(--accent-2); }
 .tag.oom { background: rgba(247, 118, 142, .2); color: var(--danger); }
 .tag.ok { background: rgba(122, 162, 247, .14); color: var(--accent); }
+.tag.ref { background: rgba(59, 68, 95, .35); color: var(--muted); }
+.tag.warn { background: rgba(224, 175, 104, .16); color: var(--warn); }
+.tag.dec { background: rgba(122, 162, 247, .10); color: var(--accent); }
+.side-note { color: var(--muted); font-size: 11.5px; line-height: 1.45; margin: 8px 0 10px; }
 
 .math { color: var(--muted); font-size: 13px; }
 .math pre {

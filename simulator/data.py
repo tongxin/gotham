@@ -16,18 +16,21 @@ MODELS = [
     {"id": "llama3-70b", "name": "LLaMA-3 70B", "params": 70.6, "layers": 80, "hidden": 8192, "heads": 64, "kv_heads": 8, "vocab": 128256, "ffn": 28672},
     {"id": "gpt3-175b", "name": "GPT-3 175B", "params": 175, "layers": 96, "hidden": 12288, "heads": 96, "vocab": 50257, "ffn": 49152},
     {"id": "deepseek-v3", "name": "DeepSeek-V3 671B", "params": 671, "active": 37, "layers": 61, "hidden": 7168, "heads": 128, "vocab": 129280, "ffn": 2048, "experts": 256, "topk": 8, "shared": 1, "moe": True, "note": "MLA, 256 experts, top-8"},
+    {"id": "deepseek-v3.2-exp", "name": "DeepSeek-V3.2-Exp 685B", "params": 685, "active": 37, "layers": 61, "hidden": 7168, "heads": 128, "kv_heads": 8, "vocab": 129280, "ffn": 2048, "experts": 256, "topk": 8, "shared": 1, "moe": True, "note": "DSA/MLA + indexer + MTP (config.json; ~685B total, ~37B active)"},
     {"id": "glm-5.2", "name": "GLM-5.2 743B", "params": 743, "active": 39, "layers": 78, "hidden": 6144, "heads": 64, "kv_heads": 8, "vocab": 151936, "ffn": 2048, "experts": 256, "topk": 8, "shared": 1, "moe": True, "note": "DSA, 256 experts, 1M ctx"},
     {"id": "glm-5.3", "name": "GLM-5.3 744B", "params": 744, "active": 40, "layers": 78, "hidden": 6144, "heads": 64, "kv_heads": 8, "vocab": 151936, "ffn": 2048, "experts": 256, "topk": 8, "shared": 1, "moe": True, "note": "Same base as 5.2, ~40B active"},
     {"id": "glm-5.3-flash", "name": "GLM-5.3-Flash 320B", "params": 320, "active": 18, "layers": 45, "hidden": 4096, "heads": 64, "kv_heads": 8, "vocab": 154880, "ffn": 2048, "experts": 288, "topk": 8, "shared": 1, "moe": True, "note": "Hybrid MLA+DSA+KDA, 288 experts top-8, 1M ctx, MTP"},
     {"id": "deepseek-v4-flash", "name": "DeepSeek-V4 Flash", "params": 284, "active": 13, "layers": 43, "hidden": 4096, "heads": 64, "kv_heads": 1, "vocab": 129280, "ffn": 2048, "experts": 256, "topk": 6, "shared": 1, "moe": True, "note": "DSA, 256 experts, top-6, 1M ctx"},
     {"id": "deepseek-v4-pro", "name": "DeepSeek-V4 Pro", "params": 1600, "active": 49, "layers": 61, "hidden": 7168, "heads": 128, "kv_heads": 1, "vocab": 129280, "ffn": 2048, "experts": 384, "topk": 6, "shared": 1, "moe": True, "note": "DSA, 384 experts, top-6, 1M ctx"},
-    {"id": "qwen3-30b-a3b", "name": "Qwen3 30B-A3B", "params": 30.5, "active": 3, "layers": 48, "hidden": 2048, "heads": 32, "kv_heads": 8, "vocab": 151936, "ffn": 6144, "experts": 64, "topk": 8, "moe": True, "note": "64 experts, top-8"},
+    {"id": "qwen3-30b-a3b", "name": "Qwen3 30B-A3B", "params": 30.5, "active": 3.3, "layers": 48, "hidden": 2048, "heads": 32, "kv_heads": 4, "vocab": 151936, "ffn": 6144, "experts": 128, "topk": 8, "moe": True, "note": "GQA, 128 experts, top-8"},
 ]
 
 GPUS = [
     {"id": "h100", "name": "NVIDIA H100 SXM", "memory_GB": 80, "bandwidth_GBps": 3350, "fp16_TFLOPS": 989.5, "fp8_TFLOPS": 1979, "fp32_TFLOPS": 67, "sram_MB": 50, "note": "Hopper, HBM3",
      "sm_count": 132, "clock_ghz": 1.83, "smem_per_sm_kb": 228, "regs_per_sm_kb": 256, "l1_per_sm_kb": 256, "l2_mb": 50, "l2_bw_gbps": 7000, "tmem_per_sm_kb": 0, "smem_bw_b_per_clk": 128},
     {"id": "h200", "name": "NVIDIA H200", "memory_GB": 141, "bandwidth_GBps": 4800, "fp16_TFLOPS": 989.5, "fp8_TFLOPS": 1979, "fp32_TFLOPS": 67, "sram_MB": 50, "note": "Hopper, HBM3e",
+     "sm_count": 132, "clock_ghz": 1.83, "smem_per_sm_kb": 228, "regs_per_sm_kb": 256, "l1_per_sm_kb": 256, "l2_mb": 50, "l2_bw_gbps": 7000, "tmem_per_sm_kb": 0, "smem_bw_b_per_clk": 128},
+    {"id": "h800", "name": "NVIDIA H800 SXM", "memory_GB": 80, "bandwidth_GBps": 3350, "fp16_TFLOPS": 989.5, "fp8_TFLOPS": 1979, "fp32_TFLOPS": 67, "sram_MB": 50, "note": "Hopper (export variant of H100; NVLink 400 GB/s)",
      "sm_count": 132, "clock_ghz": 1.83, "smem_per_sm_kb": 228, "regs_per_sm_kb": 256, "l1_per_sm_kb": 256, "l2_mb": 50, "l2_bw_gbps": 7000, "tmem_per_sm_kb": 0, "smem_bw_b_per_clk": 128},
     {"id": "b200", "name": "NVIDIA B200", "memory_GB": 192, "bandwidth_GBps": 8000, "fp16_TFLOPS": 2250, "fp8_TFLOPS": 4500, "fp32_TFLOPS": 80, "sram_MB": 126, "note": "Blackwell, dual-die",
      "sm_count": 148, "clock_ghz": 1.90, "smem_per_sm_kb": 228, "regs_per_sm_kb": 256, "l1_per_sm_kb": 256, "l2_mb": 126, "l2_bw_gbps": 16000, "tmem_per_sm_kb": 256, "smem_bw_b_per_clk": 128},

@@ -292,6 +292,265 @@ BENCHMARKS = [
             "modeling."
         ),
     },
+    {
+        "id": "sglang-glm52-h200-c64",
+        "source": "SGLang GLM-5.2 deployment cookbook, benchmark cards",
+        "url": "https://docs.sglang.io/cookbook/autoregressive/GLM/GLM-5.2",
+        "published": "2026-09-03",
+        "accessed": "2026-09-03",
+        "model": "glm-5.2",
+        "gpu": "h200",
+        "precision": "fp8",
+        "kvPrecision": "fp16",
+        "phase": "decode",
+        "B": 64,
+        "S": 8192,
+        "gpus": 8,
+        "engine": "SGLang",
+        "engineVersion": "v0.5.14 @ 49e384ce (balanced strategy)",
+        "metric": "interTokenLatencyMs",
+        "measured": 23.49,
+        "measuredThroughputTokPerSec": None,
+        "comparable": "decode",
+        "notes": (
+            "GLM-5.2 FP8 on one 8xH200 node, random dataset ISL 8192 / OSL 1024, "
+            "max_concurrency 64 (TTFT 7473 ms). Cookbook card reports TPOT 23.49 ms "
+            "and total throughput 2343 tok/s/GPU; decode-only comparison uses TPOT. "
+            "The node's TP/DP split is not printed on the benchmark card; TPOT is only "
+            "weakly G-dependent at L1 for MoE decode."
+        ),
+    },
+    {
+        "id": "sglang-glm52-h200-c256",
+        "source": "SGLang GLM-5.2 deployment cookbook, benchmark cards",
+        "url": "https://docs.sglang.io/cookbook/autoregressive/GLM/GLM-5.2",
+        "published": "2026-09-03",
+        "accessed": "2026-09-03",
+        "model": "glm-5.2",
+        "gpu": "h200",
+        "precision": "fp8",
+        "kvPrecision": "fp16",
+        "phase": "decode",
+        "B": 256,
+        "S": 8192,
+        "gpus": 8,
+        "engine": "SGLang",
+        "engineVersion": "v0.5.14 @ 49e384ce (balanced strategy)",
+        "metric": "interTokenLatencyMs",
+        "measured": 28.08,
+        "comparable": "decode",
+        "notes": (
+            "Same GLM-5.2/H200 card at max_concurrency 256 (TTFT 80562 ms), "
+            "TPOT 28.08 ms, 2391 tok/s/GPU. Saturating MoE expert traffic makes "
+            "decode per-step cost grow toward a full weight pass at this batch."
+        ),
+    },
+    {
+        "id": "sglang-glm52-b200-c64",
+        "source": "SGLang GLM-5.2 deployment cookbook, benchmark cards",
+        "url": "https://docs.sglang.io/cookbook/autoregressive/GLM/GLM-5.2",
+        "published": "2026-09-03",
+        "accessed": "2026-09-03",
+        "model": "glm-5.2",
+        "gpu": "b200",
+        "precision": "fp8",
+        "kvPrecision": "fp8",
+        "phase": "decode",
+        "B": 64,
+        "S": 8192,
+        "gpus": 8,
+        "engine": "SGLang",
+        "engineVersion": "main @ 09ca4fc (balanced strategy)",
+        "metric": "interTokenLatencyMs",
+        "measured": 17.65,
+        "comparable": "decode",
+        "notes": (
+            "GLM-5.2 FP8 on 8xB200, ISL 8192 / OSL 1024, max_concurrency 64 "
+            "(TTFT 5742 ms), TPOT 17.65 ms, 3078 tok/s/GPU. Blackwell auto-selects "
+            "an FP8 DSA KV cache."
+        ),
+    },
+    {
+        "id": "sglang-glm52-b200-c256",
+        "source": "SGLang GLM-5.2 deployment cookbook, benchmark cards",
+        "url": "https://docs.sglang.io/cookbook/autoregressive/GLM/GLM-5.2",
+        "published": "2026-09-03",
+        "accessed": "2026-09-03",
+        "model": "glm-5.2",
+        "gpu": "b200",
+        "precision": "fp8",
+        "kvPrecision": "fp8",
+        "phase": "decode",
+        "B": 256,
+        "S": 8192,
+        "gpus": 8,
+        "engine": "SGLang",
+        "engineVersion": "main @ 09ca4fc (balanced strategy)",
+        "metric": "interTokenLatencyMs",
+        "measured": 32.61,
+        "comparable": "decode",
+        "notes": (
+            "Same GLM-5.2/B200 card at max_concurrency 256 (TTFT 18744 ms), "
+            "TPOT 32.61 ms, 5022 tok/s/GPU."
+        ),
+    },
+    {
+        "id": "sglang-glm53-b300-bf16-c64",
+        "source": "SGLang GLM-5.3 deployment cookbook, benchmark cards",
+        "url": "https://docs.sglang.io/cookbook/autoregressive/GLM/GLM-5.3",
+        "published": "2026-09-03",
+        "accessed": "2026-09-03",
+        "model": "glm-5.3",
+        "gpu": "b300",
+        "precision": "fp16",
+        "kvPrecision": "fp8",
+        "phase": "decode",
+        "B": 64,
+        "S": 8192,
+        "gpus": 8,
+        "engine": "SGLang",
+        "engineVersion": "main @ 20a491d1d311 (balanced strategy)",
+        "metric": "interTokenLatencyMs",
+        "measured": 22.30,
+        "comparable": "decode",
+        "notes": (
+            "GLM-5.3 BF16 weights on B300, ISL 8192 / OSL 1024, max_concurrency 64 "
+            "(TTFT 9512 ms), TPOT 22.30 ms, 2279 tok/s/GPU. Balanced card has no "
+            "EAGLE/MTP speculative decoding; Blackwell DSA KV cache is FP8."
+        ),
+    },
+    {
+        "id": "sglang-glm53-b300-bf16-c256",
+        "source": "SGLang GLM-5.3 deployment cookbook, benchmark cards",
+        "url": "https://docs.sglang.io/cookbook/autoregressive/GLM/GLM-5.3",
+        "published": "2026-09-03",
+        "accessed": "2026-09-03",
+        "model": "glm-5.3",
+        "gpu": "b300",
+        "precision": "fp16",
+        "kvPrecision": "fp8",
+        "phase": "decode",
+        "B": 256,
+        "S": 8192,
+        "gpus": 8,
+        "engine": "SGLang",
+        "engineVersion": "main @ 20a491d1d311 (balanced strategy)",
+        "metric": "interTokenLatencyMs",
+        "measured": 25.84,
+        "comparable": "decode",
+        "notes": (
+            "Same GLM-5.3/B300 BF16 card at max_concurrency 256 (TTFT 75250 ms), "
+            "TPOT 25.84 ms, 2333 tok/s/GPU."
+        ),
+    },
+    {
+        "id": "trtllm-dsv32exp-b200-tp4-b1",
+        "source": "NVIDIA TensorRT-LLM blog: Optimizing DeepSeek-V3.2 on NVIDIA Blackwell GPUs",
+        "url": "https://nvidia.github.io/TensorRT-LLM/1.2.1/blogs/tech_blog/blog15_Optimizing_DeepSeek_V32_on_NVIDIA_Blackwell_GPUs.html",
+        "published": "2026-08-01",
+        "accessed": "2026-09-03",
+        "model": "deepseek-v3.2-exp",
+        "gpu": "b200",
+        "precision": "fp8",
+        "kvPrecision": "fp8",
+        "phase": "decode",
+        "B": 1,
+        "S": 8192,
+        "gpus": 4,
+        "engine": "TensorRT-LLM (PyTorch backend)",
+        "engineVersion": "blog benchmark: batch 1, ISL 8K, OSL 1K, 10 requests, TP4, MTP3",
+        "metric": "interTokenLatencyMs",
+        "measured": 3.2344,
+        "measuredThroughputTokPerSec": 309.2,
+        "comparable": "decode",
+        "notes": (
+            "DeepSeek-V3.2-Exp FP8 min-latency run on B200 (TP4, concurrency 1, "
+            "ISL 8192): TPOT 3.2344 ms with 3-layer MTP speculative decoding. "
+            "L1 predicts the non-speculative weight-streaming floor, so part of the "
+            "gap is draft verification, not just engine overhead."
+        ),
+    },
+    {
+        "id": "sglang-dsv3-tp16-16xh800",
+        "source": "SGLang issue #3812: Expert Parallelism benchmarks for DeepSeek-V3/R1",
+        "url": "https://github.com/sgl-project/sglang/issues/3812",
+        "published": "2025-02-23",
+        "accessed": "2026-09-03",
+        "model": "deepseek-v3",
+        "gpu": "h800",
+        "precision": "fp8",
+        "kvPrecision": "fp8",
+        "phase": "composite",
+        "B": None,
+        "S": 93,
+        "gpus": 16,
+        "N": 600,
+        "O": 201,
+        "engine": "SGLang",
+        "engineVersion": "TP16 on 2x8 H800 (request rate 40)",
+        "metric": "totalTokenThroughputTokPerSec",
+        "measured": 1606.80,
+        "measuredOutputTokPerSec": 1099.36,
+        "comparable": "reference",
+        "notes": (
+            "DeepSeek-V3 671B FP8, 600 prompts (avg ISL 93 / OSL 201), avg "
+            "concurrency 390; TTFT mean 12 s shows scheduler queueing dominates, "
+            "so L1 does not compute a prediction (listed for L2/L3 scheduler work)."
+        ),
+    },
+    {
+        "id": "sglang-dsv3-tp16-ep16-16xh800",
+        "source": "SGLang issue #3812: Expert Parallelism benchmarks for DeepSeek-V3/R1",
+        "url": "https://github.com/sgl-project/sglang/issues/3812",
+        "published": "2025-02-23",
+        "accessed": "2026-09-03",
+        "model": "deepseek-v3",
+        "gpu": "h800",
+        "precision": "fp8",
+        "kvPrecision": "fp8",
+        "phase": "composite",
+        "B": None,
+        "S": 93,
+        "gpus": 16,
+        "N": 600,
+        "O": 201,
+        "engine": "SGLang",
+        "engineVersion": "TP16 + EP16 on 2x8 H800 (request rate 40)",
+        "metric": "totalTokenThroughputTokPerSec",
+        "measured": 1687.81,
+        "measuredOutputTokPerSec": 1154.79,
+        "comparable": "reference",
+        "notes": (
+            "Same workload with --enable-ep-moe (avg concurrency 371); output "
+            "throughput 1154.79 tok/s. Reference-only at L1: queueing-dominated."
+        ),
+    },
+    {
+        "id": "redhat-vllm-qwen3-30b-a3b-h100",
+        "source": "vLLM blog / Red Hat: TurboQuant study (decode measurement quoted in the TurboQuant FAQ)",
+        "url": "https://blog.vllm.ai/2026/05/11/turboquant.html",
+        "published": "2026-05-11",
+        "accessed": "2026-09-03",
+        "model": "qwen3-30b-a3b",
+        "gpu": "h100",
+        "precision": "fp16",
+        "kvPrecision": "fp8",
+        "phase": "decode",
+        "B": None,
+        "S": 1024,
+        "gpus": 1,
+        "engine": "vLLM",
+        "engineVersion": "v0.20.2 (Red Hat measurement, May 2026)",
+        "metric": "decodeTokPerSec",
+        "measured": 4510.0,
+        "comparable": "reference",
+        "notes": (
+            "Qwen3-30B-A3B on H100: 4510 decode tok/s with FP8 KV vs 4520 BF16 KV "
+            "(Red Hat table in the TurboQuant FAQ). The concurrency / batch of the "
+            "measurement is not published, so the row is reference-only; it is the "
+            "source quoted for Qwen3-30B-A3B coverage."
+        ),
+    },
 ]
 
 

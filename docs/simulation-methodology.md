@@ -387,7 +387,8 @@ Rows are tagged by comparability:
 | `composite_serial` | end-to-end run modeled as `ceil(N/B)` serial prefill+decode waves | no (reported separately) |
 | `reference` | scheduler/engine-level result (unpublished concurrency) | no |
 
-Current headline results (report regenerated 2026-09-03):
+Current headline results (20 recorded benchmarks; 11 decode-comparable rows;
+report regenerated 2026-09-03):
 
 | Record | Measured | Spec pred | Spec err | Realistic pred | Realistic err | Implied `e_b` |
 |---|---|---|---|---|---|---|
@@ -395,14 +396,26 @@ Current headline results (report regenerated 2026-09-03):
 | vLLM Llama-3.1-8B H100, FP8 KV, B=1 | 6.60 ms ITL | 4.81 ms | −27% | 6.41 ms | −2.8% | 0.73 |
 | vLLM Llama-3.1-8B B200, FP8 KV, B=1 | 3.97 ms ITL | 2.01 ms | −49% | 2.69 ms | −32% | 0.51 |
 | GLM-5.3-Flash FP8 4×H200, B=1 | 163 tok/s (6.14 ms) | 0.94 ms | −85% | 1.25 ms | −80% | 0.15 |
+| SGLang GLM-5.2 FP8 8×H200, c64 | 23.49 ms TPOT | 20.1 ms | −14% | 26.9 ms | +14% | 0.86 |
+| SGLang GLM-5.2 FP8 8×H200, c256 | 28.08 ms TPOT | 32.4 ms | +16% | 43.2 ms | +54% | >1 (DSA KV) |
+| SGLang GLM-5.2 FP8 8×B200, c64 | 17.65 ms TPOT | 11.1 ms | −37% | 14.8 ms | −16% | 0.63 |
+| SGLang GLM-5.3 BF16 8×B300, c64 | 22.30 ms TPOT | 21.3 ms | −5% | 28.3 ms | +27% | 0.95 |
+| TRT-LLM DeepSeek-V3.2-Exp FP8 4×B200, B=1 | 3.23 ms TPOT | 1.17 ms | −64% | 1.56 ms | −52% | 0.36 |
 | vLLM Llama-3.1-8B H100, concurrency 8 (serial-wave) | 585 s | 371 s | −37% | 501 s | −14% | — |
 
-Decode-only MAPE: **46.6% (spec)** → **28.8% (realistic)**. The two H100
-single-stream rows land within ~3% of the realistic prediction; the remaining
+Decode-only MAPE across the 11 comparable rows: **34.5% (spec)** →
+**32.3% (realistic)**. The two vLLM H100 single-stream rows land within ~3% of
+the realistic prediction, and the GLM-5.2/5.3 balanced-load rows bracket it:
+at batch 64 the realistic preset is within ~16% on H200/B200/B300, while at
+batch 256 the L1 model *over-counts KV traffic* for the DSA sparse-attention
+models (implied `e_b` > 1 is an artifact of reading a full S=8192 cache instead
+of the DSA top-k subset — a known L1 limitation to address in L2). Remaining
 residuals decompose into per-step software overhead, MoE routing/communication
-latency, backend maturity (B200/FlashInfer at 51% implied bandwidth), and
-scheduler behavior (MLPerf offline/server rows are listed as references, not
-compared, because their concurrency is unpublished).
+latency (GLM-5.3-Flash and DeepSeek-V3.2-Exp at batch 1), MTP/speculative
+decoding (the TRT-LLM DeepSeek row measures draft verification, not just the
+weight-streaming floor), backend maturity, and scheduler behavior. DeepSeek-V3
+(SGLang EP benchmark) and Qwen3-30B-A3B (Red Hat decode table) rows are recorded
+as references because their concurrency or exact batch is unpublished.
 
 Reproduce from the repo root:
 

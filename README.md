@@ -154,7 +154,8 @@ Spec mode is an upper-bound model — it ignores kernel launches, communication
 overhead, and software efficiency. The realistic preset applies sustained
 efficiency factors (`compute 70%`, `DRAM 75%` of spec by default), and the
 Validation page quantifies the remaining error against measured records (decode
-MAPE drops from ~47% at spec peaks to ~29% realistic). For the next step — how
-data, tensor, pipeline, and expert parallelism move bytes between chips and when
-communication becomes the bottleneck — see the companion interactive
+MAPE over 11 decode records: 34.5% at spec peaks vs 32.3% realistic; the two
+single-stream H100 Llama rows land within ~3% realistic). For the next step —
+how data, tensor, pipeline, and expert parallelism move bytes between chips and
+when communication becomes the bottleneck — see the companion interactive
 visualization: [How to Parallelize a Transformer for Training](https://ezyang.github.io/interactive-parallelize-transformer/).

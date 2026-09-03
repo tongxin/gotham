@@ -73,8 +73,12 @@ in-browser WASM core otherwise, so the same pages work in both modes.
   datasheet, the classic upper bound) and *Realistic* (compute 70% / DRAM 75%
   of spec by default, calibrated from the validation records; sliders override).
 - **Validate the model** — the Validation tab replays measured records (vLLM,
-  TensorRT-LLM, MLPerf/Red Hat) in both modes, reports signed errors per row,
-  MAPE aggregates, and each row's implied HBM efficiency, and links the recorded
+  TensorRT-LLM, MLPerf/Red Hat) filtered to the current L1 page selection —
+  models, GPU, precision, and operating point (spec or your realistic
+  sliders) — and reports signed errors per row, MAPE aggregates, and each
+  row's implied HBM efficiency. When a toggled combination has no measured
+  ground truth (or only a different-dtype measurement), it says so instead of
+  silently showing nothing. The recorded report is at
   `benchmarks/validation_report.json`.
 - **Explore the ridge** — the batch-size sweep shows how decode moves from the
   memory-bound regime toward the compute ceiling as the batch grows.
@@ -98,6 +102,7 @@ simulator/test_core.py  sanity checks (python3 simulator/test_core.py)
 simulator/validation_data.py  measured benchmark records (sources + configs)
 simulator/validate.py         L1 validation replay + report writer
 js/app.js            UI state + fetch/render (no simulation math)
+js/l1_state.js       persists the L1 selection so validation.html stays synced
 js/app_validation.js Validation page UI (replays records via server or WASM)
 js/app_l2.js         L2 UI (kernel breakdown, L1-vs-L2 comparison)
 js/chart.js          SVG chart renderers (roofline, memory, throughput)

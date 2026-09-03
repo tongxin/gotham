@@ -198,6 +198,19 @@
 
   function refresh() {
     if (!catalog) return;
+    L1State.write({
+      models: state.models.slice(),
+      gpuId: state.gpuId,
+      precision: state.precision,
+      kvPrecision: state.kvPrecision,
+      phase: state.phase,
+      B: state.B,
+      S: state.S,
+      gpus: state.gpus,
+      mode: state.mode,
+      computeScale: state.computeScale,
+      bandwidthScale: state.bandwidthScale,
+    });
     var seq = ++requestSeq;
     clearTimeout(timer);
     timer = setTimeout(function () {

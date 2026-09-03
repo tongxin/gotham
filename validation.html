@@ -21,14 +21,26 @@
     <main class="content">
       <section class="panel">
         <div class="panel-head">
+          <h2>Synced from the L1 page</h2>
+          <a href="index.html" class="tab-link">Open L1 page</a>
+        </div>
+        <div id="syncChips" class="side-note">Reading the L1 selection…</div>
+        <div id="coverageNotes"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
           <h2>Predicted vs measured: where the L1 model stands</h2>
           <span id="coreTag" class="tag ok">—</span>
         </div>
         <p class="side-note">
-          Every row replays an independently published measurement through the L1 core in two
-          operating points: <strong>spec</strong> (100% of datasheet peaks) and
-          <strong>realistic</strong> (compute
+          Records are filtered to the models, GPU, precision, and operating point selected on the
+          L1 page; every row below replays an independently published measurement through the L1
+          core at <strong>spec</strong> (100% of datasheet peaks) and at your
+          <strong>selected L1 operating point</strong> (compute
           <span id="effCompute">70</span>% · DRAM <span id="effBandwidth">75</span>% of spec).
+          When a toggled combination has no measured ground truth, the panel above says so instead
+          of silently showing nothing.
           Signed error = (predicted − measured) / measured; positive means the simulator
           over-predicts. Full records, URLs, and caveats live in
           <code>simulator/validation_data.py</code> and the generated
@@ -83,6 +95,7 @@
   </div>
 
   <script src="js/data_static.js"></script>
+  <script src="js/l1_state.js"></script>
   <script src="js/simapi.js"></script>
   <script src="js/app_validation.js"></script>
 </body>
